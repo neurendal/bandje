@@ -1,0 +1,56 @@
+# Builds both apps and runs their network checks: Bandje's own code must contain no networking code,
+# no analytics and no screen recording, and the built apps get no network entitlements beyond the
+# speech engine's license check.
+name: No network
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)"
+          [ -n "$XCODE" ] && sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Cache the speech models
+        uses: actions/cache@v4
+        with:
+          path: ~/Music/Bandje/.models
+          key: models-${{ hashFiles('macos/models.lock.json') }}
+
+      - name: Fetch the speech models (checked against models.lock.json)
+        run: macos/scripts/fetch-models.sh
+
+      - name: Mac – build
+        working-directory: macos
+        run: make app BUNDLE_MODELS=0
+
+      - name: Mac – network check
+        working-directory: macos
+        run: ./scripts/check-no-network.sh
+
+      - name: iPhone and iPad – build
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          make gen
+          xcodebuild -quiet -project Bandje.xcodeproj -scheme Bandje \
+            -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
+            -destination 'generic/platform=iOS Simulator' -configuration Debug build
+
+      - name: iPhone and iPad – network check
+        working-directory: ios
+        run: ./scripts/check-no-network.sh
