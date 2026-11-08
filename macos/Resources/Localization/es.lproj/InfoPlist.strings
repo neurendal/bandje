@@ -1,0 +1,8 @@
+/* Bandje, es, InfoPlist. Generated order; edit values only. Placeholders %@ / %1$@ must stay. */
+
+/* Info.plist (macOS permission dialog) | NL: Band·je neemt het geluid van je Mac op, zoals de andere kant van een gesprek (rechterkanaal van de opname). */
+"NSAudioCaptureUsageDescription" = "Band·je graba el audio de tu Mac, como la otra parte de una llamada (canal derecho de la grabación).";
+
+/* Info.plist (macOS permission dialog) | NL: Band·je neemt jouw stem op via de microfoon (linkerkanaal van de opname). */
+"NSMicrophoneUsageDescription" = "Band·je graba tu voz a través del micrófono (canal izquierdo de la grabación).";
+

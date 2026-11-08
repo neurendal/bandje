@@ -1,0 +1,196 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Start a recording in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Start a recording in ${applicationName}",
+              "Record with ${applicationName}"
+            ]
+          }
+        },
+        "nl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Start een opname in ${applicationName}",
+              "Neem op met ${applicationName}"
+            ]
+          }
+        },
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Starte eine Aufnahme in ${applicationName}",
+              "Mit ${applicationName} aufnehmen"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Démarre un enregistrement dans ${applicationName}",
+              "Enregistre avec ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Inicia una grabación en ${applicationName}",
+              "Graba con ${applicationName}"
+            ]
+          }
+        },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Avvia una registrazione in ${applicationName}",
+              "Registra con ${applicationName}"
+            ]
+          }
+        },
+        "pt" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Iniciar uma gravação no ${applicationName}",
+              "Gravar com o ${applicationName}"
+            ]
+          }
+        },
+        "pl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Rozpocznij nagrywanie w ${applicationName}",
+              "Nagraj w ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Начать запись в ${applicationName}",
+              "Записать в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Почни запис у ${applicationName}",
+              "Запиши в ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Stop the recording in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Stop the recording in ${applicationName}",
+              "Stop ${applicationName}"
+            ]
+          }
+        },
+        "nl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Stop de opname in ${applicationName}",
+              "Stop ${applicationName}"
+            ]
+          }
+        },
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Stoppe die Aufnahme in ${applicationName}",
+              "${applicationName} stoppen"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Arrête l’enregistrement dans ${applicationName}",
+              "Arrête ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Detén la grabación en ${applicationName}",
+              "Detén ${applicationName}"
+            ]
+          }
+        },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Interrompi la registrazione in ${applicationName}",
+              "Ferma ${applicationName}"
+            ]
+          }
+        },
+        "pt" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Parar a gravação no ${applicationName}",
+              "Parar o ${applicationName}"
+            ]
+          }
+        },
+        "pl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Zatrzymaj nagrywanie w ${applicationName}",
+              "Zatrzymaj ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Остановить запись в ${applicationName}",
+              "Стоп ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Зупини запис у ${applicationName}",
+              "Зупини ${applicationName}"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

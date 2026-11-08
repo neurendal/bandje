@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<!-- Bandje's own code collects nothing. The Desert Ant Labs SDK declares its license check
+	     (a random install ID, not linked, not tracking) in its own PrivacyInfo.xcprivacy. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- Settings: shortcuts, language, recordings folder, first-run flags. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>CA92.1</string></array>
+		</dict>
+		<dict>
+			<!-- Creation and modification dates of recordings in the folder the user chose, to sort
+			     them (Choose Recording) and find the latest one. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>3B52.1</string><string>C617.1</string></array>
+		</dict>
+		<dict>
+			<!-- Free disk space: refuse to start, or stop, a recording when the disk is nearly full. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>E174.1</string></array>
+		</dict>
+		<dict>
+			<!-- mach_absolute_time: elapsed time between audio buffers while recording. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>35F9.1</string></array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,17 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+SourcePackages/
+.build/
+Tests/fixtures/*.wav
+Tests/fixtures/*.aiff
+Tests/fixtures/*.m4a
+Tests/fixtures/*.mp3
+Tests/fixtures/*.caf
+Tests/fixtures/*.mp4
+*.m4a
+*.caf
+__pycache__/

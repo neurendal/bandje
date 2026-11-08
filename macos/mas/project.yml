@@ -1,0 +1,82 @@
+# XcodeGen spec for the Mac App Store build. Generated into mas/Bandje.xcodeproj by scripts/mas.sh;
+# never edit or commit the .xcodeproj. Day-to-day builds use the Makefile (SwiftPM); this project
+# only exists because App Store signing, provisioning and upload go through Xcode.
+name: Bandje
+options:
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  # Icon Composer documents (.icon, shared with the iPhone app) are compiled by actool.
+  fileTypes:
+    icon:
+      file: true
+      buildPhase: resources
+
+packages:
+  desert-ant-core:
+    url: https://github.com/Desert-Ant-Labs/desert-ant-core.git
+    exactVersion: 4.2.3
+
+settings:
+  base:
+    PRODUCT_NAME: Bandje
+    PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje
+    # Neurendal B.V. organisation team. Xcode (Settings > Accounts) creates the certificates and
+    # the Mac App Store profile itself (-allowProvisioningUpdates).
+    DEVELOPMENT_TEAM: KKWHW59YC3
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_ENTITLEMENTS: ../Resources/Bandje-AppStore.entitlements
+    # scripts/mas.sh writes this copy of Resources/Info.plist with the build number.
+    INFOPLIST_FILE: ../build/mas/Info.plist
+    GENERATE_INFOPLIST_FILE: NO
+    SWIFT_VERSION: "5.0"
+    ARCHS: arm64
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEAD_CODE_STRIPPING: YES
+    COMBINE_HIDPI_IMAGES: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    # Only the App Store build asks for a review (ReviewPrompt); a build from GitHub never does.
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APPSTORE"
+
+targets:
+  Bandje:
+    type: application
+    platform: macOS
+    sources:
+      - path: ../Sources/Bandje
+      - path: ../Resources/AppIcon.icon
+        buildPhase: resources
+      - path: ../Resources/Logo.png
+        buildPhase: resources
+      # AccentColor (Band·je red, as the player's position knob): Settings' tabs; NSAccentColorName in Info.plist.
+      - path: ../Resources/Assets.xcassets
+        buildPhase: resources
+      - path: ../Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: ../Resources/Localization
+        type: folder
+        buildPhase: none
+    dependencies:
+      - package: desert-ant-core
+        product: Voz
+      - package: desert-ant-core
+        product: Who
+    postBuildScripts:
+      # Run before Xcode signs the app, so the help book, translations and models are sealed in.
+      - name: Translations, help book and speech models
+        shell: /bin/zsh
+        script: |
+          set -e
+          APP="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+          ROOT="$PROJECT_DIR/.."
+          cp -R "$ROOT"/Resources/Localization/*.lproj "$APP/Contents/Resources/"
+          python3 -I "$ROOT/scripts/make-help.py" build "$APP"
+          MODELS="${BANDJE_MODELS:-$HOME/Music/Bandje/.models}"
+          if [ ! -f "$MODELS/voz/meta.json" ] || [ ! -d "$MODELS/who" ]; then
+            echo "error: speech models missing in $MODELS (run scripts/fetch-models.sh)"; exit 1
+          fi
+          python3 -I "$ROOT/scripts/dev/fetch_models.py" "$MODELS"
+          mkdir -p "$APP/Contents/Resources/Models"
+          cp -Rc "$MODELS/voz" "$MODELS/who" "$APP/Contents/Resources/Models/"
+        basedOnDependencyAnalysis: false

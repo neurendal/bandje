@@ -1,0 +1,174 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Band·je"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Band·je"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "NSLocationWhenInUseUsageDescription" : {
+      "comment" : "Privacy - Location When In Use Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je saves where a recording was made, when you turn this on. The location stays with the recording on your device."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je bewaart waar een opname is gemaakt, als je dat aanzet. De locatie blijft bij de opname op je toestel."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je sichert, wo eine Aufnahme gemacht wurde, wenn du das einschaltest. Der Standort bleibt bei der Aufnahme auf deinem Gerät."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je conserve le lieu d’un enregistrement, si vous l’activez. La position reste avec l’enregistrement sur votre appareil."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je guarda dónde se hizo una grabación, si lo activas. La ubicación se queda con la grabación en tu dispositivo."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je salva dove è stata fatta una registrazione, se attivi questa opzione. La posizione resta con la registrazione sul tuo dispositivo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Band·je salva onde uma gravação foi feita, se você ativar isso. A localização fica junto com a gravação no seu dispositivo."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je zapisuje miejsce nagrania, jeśli to włączysz. Lokalizacja zostaje przy nagraniu na Twoim urządzeniu."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je сохраняет место записи, если вы это включите. Геопозиция хранится вместе с записью на вашем устройстве."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je зберігає місце, де зроблено запис, якщо ви це ввімкнете. Місцезнаходження залишається разом із записом на вашому пристрої."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Privacy - Microphone Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je records with the microphone. Recordings stay on your device, or in your own iCloud Drive if you turn on sync."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je neemt op met de microfoon. Opnames blijven op je toestel, of in je eigen iCloud Drive als je synchroniseren aanzet."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je nimmt mit dem Mikrofon auf. Aufnahmen bleiben auf deinem Gerät oder in deinem eigenen iCloud Drive, wenn du die Synchronisierung einschaltest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je enregistre avec le micro. Les enregistrements restent sur votre appareil, ou dans votre propre iCloud Drive si vous activez la synchronisation."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je graba con el micrófono. Las grabaciones se quedan en tu dispositivo, o en tu propio iCloud Drive si activas la sincronización."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je registra con il microfono. Le registrazioni restano sul tuo dispositivo, o nel tuo iCloud Drive se attivi la sincronizzazione."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Band·je grava com o microfone. As gravações ficam no seu dispositivo, ou no seu próprio iCloud Drive se você ativar a sincronização."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je nagrywa za pomocą mikrofonu. Nagrania zostają na Twoim urządzeniu albo w Twoim własnym iCloud Drive, jeśli włączysz synchronizację."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je записывает с помощью микрофона. Записи остаются на вашем устройстве или в вашем собственном iCloud Drive, если вы включите синхронизацию."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je записує через мікрофон. Записи залишаються на вашому пристрої або у вашому власному iCloud Drive, якщо ви ввімкнете синхронізацію."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

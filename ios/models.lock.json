@@ -1,0 +1,184 @@
+{
+  "voz": {
+    "commit": "12802bf4e2b5e97e1289b723bc6283b6f1a1ace5",
+    "files": {
+      "decoder.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "cc2be0dbcd0c7d8d915aa3621869ea074791c432ba7b4bb6e029c483087f7189",
+        "size": 243
+      },
+      "decoder.mlmodelc/coremldata.bin": {
+        "sha256": "2d7a5210e91e4e3b25c547db4b76ea14bf769db9f71e7659c027008041e38d2d",
+        "size": 1093
+      },
+      "decoder.mlmodelc/metadata.json": {
+        "sha256": "798639c54e4eb71bcfa5dbc15b62c0a341c37b265d1a9c879c28a40b06549875",
+        "size": 18528
+      },
+      "decoder.mlmodelc/model.mil": {
+        "sha256": "1f331acb4a4bb999c792db0a3725d790c046311ab9941ddbe0ee7e3418ae1e14",
+        "size": 99410
+      },
+      "decoder.mlmodelc/weights/weight.bin": {
+        "sha256": "12ab4cbb83155dbaf3d9832f524c23b803e3e266863d9c6f3d58e1d88577e130",
+        "size": 12277132
+      },
+      "embedding.f16": {
+        "sha256": "07163e5f6f8a68f9ffeed7a8ff770c68098c2db216232321912188bd614b9a72",
+        "size": 10487040
+      },
+      "encoder.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "983e1e4e31f6ef386fba8d35202984c6ec11ff688f62cf3fde57dd957d40ff27",
+        "size": 243
+      },
+      "encoder.mlmodelc/coremldata.bin": {
+        "sha256": "02327c1dc4dc362dfcb1061f785a24ee3bcb86853ecaa818511ae71ca2e2a0b8",
+        "size": 430
+      },
+      "encoder.mlmodelc/metadata.json": {
+        "sha256": "81e00f4d507edf2e6d045a9826362f3c6e314e60ef16a28aef4c99d693876991",
+        "size": 2739
+      },
+      "encoder.mlmodelc/model.mil": {
+        "sha256": "974c88c39c840c21b031f10529943516d1d8469535f0ddc3571cddaab29574e4",
+        "size": 820490
+      },
+      "encoder.mlmodelc/weights/weight.bin": {
+        "sha256": "72b6e867cb3176cea36fc1410622b7bfd50043e80eafbaab03ae0a53382908c2",
+        "size": 312039808
+      },
+      "mel.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "d1cabbea932a1be1b53a1adc0d434d5a7a1f097d9679d3d995183238773de472",
+        "size": 243
+      },
+      "mel.mlmodelc/coremldata.bin": {
+        "sha256": "e6598e764b01f8ba06fa787f2bc22d7707f97c2954492d77a2736800fd006f5d",
+        "size": 405
+      },
+      "mel.mlmodelc/metadata.json": {
+        "sha256": "6be5be2c02370c3a218b712046ea50c8486f4e20fd70558458d5980d1c296e53",
+        "size": 2215
+      },
+      "mel.mlmodelc/model.mil": {
+        "sha256": "aae23c58b6aa3093063f75a392d9f44deb324804c3fbb58fa3e55bb7f371ece1",
+        "size": 9728
+      },
+      "mel.mlmodelc/weights/weight.bin": {
+        "sha256": "34f8a1bcf01e6a6ae053efe012cd189e0c38e9dca65660f199740ce9a0958f95",
+        "size": 826688
+      },
+      "meta.json": {
+        "sha256": "2b5fa951d70cbbab49fccf31836521be8305d0d9557b9bedf45cc8dcdc61b53b",
+        "size": 584
+      },
+      "vocab.json": {
+        "sha256": "3eb2f73e8853dce5156c2ed97c0b1bb84eb4ebd201eb1761d15977fc1ea31490",
+        "size": 78654
+      }
+    },
+    "repo": "desert-ant-labs/voz",
+    "revision": "v0.5.0"
+  },
+  "who": {
+    "commit": "f026f4604f874e2cfe6b817e5123c2b64a56683d",
+    "files": {
+      "coreml-fp16/encoder_30000.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "2f2656633f626f87beba6e47e533baed3874d1eacd3228c2bf351326858cc53e",
+        "size": 243
+      },
+      "coreml-fp16/encoder_30000.mlmodelc/coremldata.bin": {
+        "sha256": "a1b2a35fddb8755483ca4bd9cb3d51e15c79c1e9ce3b052e1e55f69ba75a444e",
+        "size": 399
+      },
+      "coreml-fp16/encoder_30000.mlmodelc/model.mil": {
+        "sha256": "3adf9eb810955c207527c87868ff926b8594919d5ea2cc7e5a220d4ea2aa3499",
+        "size": 228136
+      },
+      "coreml-fp16/encoder_30000.mlmodelc/weights/weight.bin": {
+        "sha256": "998194432a81fef3c66350502c624cf844e62592223c25bf5deb93031f529bd1",
+        "size": 23349888
+      },
+      "coreml-fp16/encoder_6000.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "203e8dfd90815c1d197147d44cf9cc41da5031c5c0fe15398918023bb3c57722",
+        "size": 243
+      },
+      "coreml-fp16/encoder_6000.mlmodelc/coremldata.bin": {
+        "sha256": "f3c6f8e3f44270e1d0672cb0ecce98de3a2de3715a0d1c2f13f6cb341f28fb76",
+        "size": 397
+      },
+      "coreml-fp16/encoder_6000.mlmodelc/model.mil": {
+        "sha256": "22c7928cf61eb8594436075f1200f489232a5fc9ed61dc8b3fdfb6e7287418e6",
+        "size": 227558
+      },
+      "coreml-fp16/encoder_6000.mlmodelc/weights/weight.bin": {
+        "sha256": "fa34257f332b5ebfcd53d1461cbb87f76a02c5bb129a33703dcafd9a11477316",
+        "size": 20834688
+      },
+      "coreml-fp16/queries_30000.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "92335d6b04331041d4f255e5bafe7befc837a9f6d37d03fa4beeba25cb4cb347",
+        "size": 243
+      },
+      "coreml-fp16/queries_30000.mlmodelc/coremldata.bin": {
+        "sha256": "979397a485b3c0e1c9a8dd6e4c8bffeed4f019b8323b722b3c586ff311f056b7",
+        "size": 504
+      },
+      "coreml-fp16/queries_30000.mlmodelc/model.mil": {
+        "sha256": "6d2f360abe974b7bd9fce4e077735a005ff54d0640d23be50041768b6c75379a",
+        "size": 135814
+      },
+      "coreml-fp16/queries_30000.mlmodelc/weights/weight.bin": {
+        "sha256": "46687be0f958349341bc7e2bf84bda5e4d7365ff5056462a205d19f1f56f81fb",
+        "size": 13019136
+      },
+      "coreml-fp16/queries_6000.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "617e1a729e0a763826236a7a4cd1e2d6252aad96b34f052a9044c8e7f7c00800",
+        "size": 243
+      },
+      "coreml-fp16/queries_6000.mlmodelc/coremldata.bin": {
+        "sha256": "76b9725564138b9741ac553e1d8fdd03987645e603124edd2fa0c575e706ccb4",
+        "size": 452
+      },
+      "coreml-fp16/queries_6000.mlmodelc/model.mil": {
+        "sha256": "5f9a152aa7c01fc4ba2c8916e29d6ec581cb3b41df53afc44661b85be7c2336b",
+        "size": 134015
+      },
+      "coreml-fp16/queries_6000.mlmodelc/weights/weight.bin": {
+        "sha256": "46687be0f958349341bc7e2bf84bda5e4d7365ff5056462a205d19f1f56f81fb",
+        "size": 13019136
+      },
+      "coreml-fp16/voice_3256.mlmodelc/analytics/coremldata.bin": {
+        "sha256": "874f2018ec09db2d185cb43c1c55a65d383b4b8d6f435d746e1c73045594fb48",
+        "size": 243
+      },
+      "coreml-fp16/voice_3256.mlmodelc/coremldata.bin": {
+        "sha256": "ac5fb237dc7f59da6bb643f7de7ee98dafadd9b3c3f3770cd1df680abc53a442",
+        "size": 373
+      },
+      "coreml-fp16/voice_3256.mlmodelc/model.mil": {
+        "sha256": "6eebc5e3608f69ebe755c51f7d7b98799e1310afb93df643a1c98cf00f9caf89",
+        "size": 57727
+      },
+      "coreml-fp16/voice_3256.mlmodelc/weights/weight.bin": {
+        "sha256": "b8c030fc8b0053f9274f4f54a87e9c575ce2df9dd207f4098a1ca96ec0dfa57f",
+        "size": 10642880
+      },
+      "coreml-fp16/who_embed.f16": {
+        "sha256": "2f2cb55e4370c30b3d5f0401bf421e018fcc8633f5d3aef225375704c60a8c1c",
+        "size": 2621960
+      },
+      "coreml-fp16/who_mel_banks.f32": {
+        "sha256": "730d76d5d2099d964c705c82c4556e2b10792d287666aa97edb0633f88f08ce0",
+        "size": 23652
+      },
+      "coreml-fp16/who_meta.json": {
+        "sha256": "cd2a2e311db7e7f6c0248a635b59b21fff5028837fef9ccc1ea5c715edd7e737",
+        "size": 3954
+      },
+      "coreml-fp16/who_voice_banks.f32": {
+        "sha256": "df33ff45ac021f5d014356b4e9ab4b9f91fadd836649962ee6e89eadfcd264e3",
+        "size": 82248
+      }
+    },
+    "repo": "desert-ant-labs/who",
+    "revision": "v0.3.4"
+  }
+}

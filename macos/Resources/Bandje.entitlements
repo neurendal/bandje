@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Local builds (make app / make install). The App Store build uses Bandje-AppStore.entitlements:
+  the same plus iCloud Documents, which needs a provisioning profile (scripts/mas.sh). network.client is only for the Desert Ant Labs SDK's
+  license check (at most once per model per month); Bandje's own code never uses the network.
+  Never add network.server.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Druk af… (⌘P): the transcript as the PDF that Deel also makes. -->
+	<key>com.apple.security.print</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.assets.music.read-write</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

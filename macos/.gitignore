@@ -1,0 +1,8 @@
+.build/
+build/
+*.xcuserstate
+.DS_Store
+__pycache__/
+# Test audio is made locally with macOS voices: scripts/dev/make-fixtures.sh
+Tests/fixtures/*.wav
+mas/Bandje.xcodeproj/

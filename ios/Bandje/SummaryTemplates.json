@@ -1,0 +1,212 @@
+{
+ "de": {
+  "fileWord": "Zusammenfassung",
+  "templates": [
+   {
+    "name": "Besprechung",
+    "text": "## Zusammenfassung\nDas wichtigste Ergebnis des Gesprächs in zwei oder drei Sätzen.\n\n## Entscheidungen\nJede Entscheidung als Aufzählungspunkt. Nenne, wer entschieden hat, falls das gesagt wurde.\n\n## Aufgaben\nEin Aufzählungspunkt pro Aufgabe: wer, was und bis wann (die Frist wie genannt).\n\n## Offene Fragen\nFragen und Themen, die nicht beantwortet oder geklärt wurden.\n\n## Nächste Schritte\nDie nächste Besprechung oder das nächste Gespräch: Datum, Uhrzeit und wer, falls genannt.\n"
+   },
+   {
+    "name": "Vorstellungsgespräch",
+    "text": "## Bewerber\nName, aktuelle Position und aktueller Arbeitgeber.\n\n## Erfahrung und Fähigkeiten\nRelevante Erfahrung, Projekte und Fähigkeiten, die die Person genannt hat.\n\n## Motivation\nWarum diese Stelle und dieses Unternehmen, und warum die Person den aktuellen Arbeitgeber verlassen möchte.\n\n## Gehalt und Konditionen\nGehaltsvorstellung oder -spanne mit den genauen Beträgen, Kündigungsfrist, Startdatum, Arbeitszeit, Homeoffice, Arbeitsweg, Weiterbildungsbudget und alle anderen genannten Konditionen.\n\n## Andere Bewerbungen\nAndere Gespräche oder Angebote der Person, und wie weit sie sind.\n\n## Fragen der Person\nWas die Person gefragt hat, und die Antwort.\n\n## Eindruck\nStärken und Bedenken, die im Gespräch selbst zur Sprache kamen. Keine eigene Meinung.\n\n## Nächste Schritte\nDer nächste Schritt: was, wann und wer.\n"
+   },
+   {
+    "name": "Kundeninterview (Produktvalidierung)",
+    "text": "## Gesprächspartner\nName, Rolle und Organisation, und wie die Person zur Zielgruppe passt.\n\n## Problem\nDas Problem in den eigenen Worten der Person: wie oft es auftritt und was es kostet (Zeit, Geld, Frust).\n\n## Aktuelle Lösung\nWas die Person heute tut oder nutzt, und was das kostet.\n\n## Schmerzpunkte\nJeder Schmerzpunkt als Aufzählungspunkt, mit einem wörtlichen Zitat in Anführungszeichen.\n\n## Verhalten, keine Meinungen\nWas die Person tatsächlich getan hat (gesucht, gekauft, selbst gebaut), getrennt von Meinungen über ein künftiges Produkt.\n\n## Zahlungsbereitschaft\nAnzeichen, dass die Person zahlen oder wechseln würde, mit Beträgen, falls genannt. Zusagen (Pilot, Vorstellung, Vorbestellung) getrennt.\n\n## Annahmen\nWelche Annahmen über das Problem oder die Lösung dieses Gespräch bestätigt oder widerlegt. Nur was das Gespräch zeigt.\n\n## Überraschungen\nWas unerwartet war.\n\n## Nächste Schritte\nVereinbarungen und nächste Schritte.\n"
+   },
+   {
+    "name": "Allgemeine Zusammenfassung",
+    "text": "## Zusammenfassung\nWorum es im Gespräch ging und das wichtigste Ergebnis, in zwei oder drei Sätzen.\n\n## Kernpunkte\nDie wichtigsten Themen, Fakten und Standpunkte, jeweils als Aufzählungspunkt. Nenne bei einem Standpunkt, wer ihn vertrat. Übernimm Namen, Zahlen, Beträge und Daten genau so, wie sie gesagt wurden.\n\n## Vereinbarungen und nächste Schritte\nWas vereinbart wurde oder noch geschehen muss: für jeden Punkt wer, was und wann.\n\n## Offene Fragen\nFragen und Themen, die nicht beantwortet oder geklärt wurden.\n"
+   }
+  ]
+ },
+ "en": {
+  "fileWord": "summary",
+  "templates": [
+   {
+    "name": "Meeting",
+    "text": "## Summary\nThe main outcome of the conversation in two or three sentences.\n\n## Decisions\nEach decision as a bullet. Say who decided, if that was said.\n\n## Action items\nOne bullet per action item: who, what and when (the deadline as mentioned).\n\n## Open questions\nQuestions and topics that were not answered or settled.\n\n## Next steps\nThe next meeting or call: date, time and who, if mentioned.\n"
+   },
+   {
+    "name": "Job interview",
+    "text": "## Candidate\nName, current role and current employer.\n\n## Experience and skills\nRelevant experience, projects and skills the candidate mentioned.\n\n## Motivation\nWhy this role and this company, and why the candidate wants to leave their current employer.\n\n## Salary and terms\nSalary expectation or range with the exact amounts, notice period, start date, hours, remote work, commute, training budget and any other terms mentioned.\n\n## Other applications\nOther interviews or offers the candidate has, and how far along they are.\n\n## Questions from the candidate\nWhat the candidate asked, and the answer.\n\n## Impression\nStrengths and concerns that came up in the conversation itself. No opinion of your own.\n\n## Next steps\nThe next step: what, when and who.\n"
+   },
+   {
+    "name": "Customer interview (product validation)",
+    "text": "## Interviewee\nName, role and organization, and how the interviewee fits the target segment.\n\n## Problem\nThe problem in the interviewee's own words: how often it happens and what it costs (time, money, frustration).\n\n## Current solution\nWhat the interviewee does or uses today, and what it costs.\n\n## Pain points\nEach pain point as a bullet, with a literal quote in quotation marks.\n\n## Behavior, not opinions\nWhat the interviewee actually did (searched, bought, built themselves), apart from opinions about a future product.\n\n## Willingness to pay\nSigns that the interviewee would pay or switch, with amounts if mentioned. Commitments (pilot, introduction, pre-order) separately.\n\n## Assumptions\nWhich assumptions about the problem or the solution this conversation confirms or refutes. Only what the conversation shows.\n\n## Surprises\nWhat was unexpected.\n\n## Next steps\nAgreements and next steps.\n"
+   },
+   {
+    "name": "Generic summary",
+    "text": "## Summary\nWhat the conversation was about and its main outcome, in two or three sentences.\n\n## Key points\nThe main topics, facts and views, each as a bullet. For a view, say who held it. Keep names, numbers, amounts and dates exactly as they were said.\n\n## Agreements and next steps\nWhat was agreed or still needs to happen: for each point who, what and when.\n\n## Open questions\nQuestions and topics that were not answered or settled.\n"
+   }
+  ]
+ },
+ "es": {
+  "fileWord": "resumen",
+  "templates": [
+   {
+    "name": "Reunión",
+    "text": "## Resumen\nEl resultado principal de la conversación en dos o tres frases.\n\n## Decisiones\nCada decisión en una viñeta. Indica quién la tomó, si se dijo.\n\n## Tareas\nUna viñeta por tarea: quién, qué y cuándo (el plazo tal como se dijo).\n\n## Preguntas abiertas\nPreguntas y temas que no se respondieron ni se cerraron.\n\n## Próximos pasos\nLa próxima reunión o llamada: fecha, hora y quién, si se mencionó.\n"
+   },
+   {
+    "name": "Entrevista de trabajo",
+    "text": "## Candidato\nNombre, puesto actual y empresa actual.\n\n## Experiencia y habilidades\nExperiencia, proyectos y habilidades relevantes que mencionó el candidato.\n\n## Motivación\nPor qué este puesto y esta empresa, y por qué el candidato quiere dejar su empresa actual.\n\n## Salario y condiciones\nExpectativa o banda salarial con las cifras exactas, plazo de preaviso, fecha de incorporación, horario, teletrabajo, desplazamiento, presupuesto de formación y cualquier otra condición mencionada.\n\n## Otros procesos\nOtras entrevistas u ofertas que tiene el candidato, y en qué fase están.\n\n## Preguntas del candidato\nLo que preguntó el candidato, y la respuesta.\n\n## Impresión\nPuntos fuertes y dudas que surgieron en la propia conversación. Sin opinión propia.\n\n## Próximos pasos\nEl siguiente paso: qué, cuándo y quién.\n"
+   },
+   {
+    "name": "Entrevista con cliente (validación de producto)",
+    "text": "## Persona entrevistada\nNombre, cargo y organización, y cómo encaja en el segmento objetivo.\n\n## Problema\nEl problema en sus propias palabras: con qué frecuencia ocurre y qué le cuesta (tiempo, dinero, frustración).\n\n## Solución actual\nLo que hace o usa hoy, y cuánto le cuesta.\n\n## Puntos de dolor\nCada punto de dolor en una viñeta, con una cita literal entre comillas.\n\n## Hechos, no opiniones\nLo que la persona hizo de verdad (buscó, compró, se lo construyó), aparte de opiniones sobre un producto futuro.\n\n## Disposición a pagar\nSeñales de que pagaría o cambiaría, con importes si se mencionaron. Los compromisos (piloto, presentación a terceros, reserva) por separado.\n\n## Hipótesis\nQué hipótesis sobre el problema o la solución confirma o refuta esta conversación. Solo lo que muestra la conversación.\n\n## Sorpresas\nLo que fue inesperado.\n\n## Próximos pasos\nAcuerdos y próximos pasos.\n"
+   },
+   {
+    "name": "Resumen general",
+    "text": "## Resumen\nDe qué trató la conversación y su resultado principal, en dos o tres frases.\n\n## Puntos clave\nLos temas, hechos y opiniones principales, cada uno en una viñeta. En cada opinión, indica de quién es. Mantén nombres, cifras, importes y fechas exactamente como se dijeron.\n\n## Acuerdos y próximos pasos\nLo que se acordó o aún debe hacerse: en cada punto, quién, qué y cuándo.\n\n## Preguntas abiertas\nPreguntas y temas que no se respondieron ni se cerraron.\n"
+   }
+  ]
+ },
+ "fr": {
+  "fileWord": "résumé",
+  "templates": [
+   {
+    "name": "Réunion",
+    "text": "## Résumé\nLe principal résultat de la conversation en deux ou trois phrases.\n\n## Décisions\nChaque décision sous forme de puce. Indiquez qui a décidé, si cela a été dit.\n\n## Actions\nUne puce par action : qui, quoi et quand (l’échéance telle que mentionnée).\n\n## Questions ouvertes\nLes questions et sujets restés sans réponse ou non tranchés.\n\n## Prochaines étapes\nLa prochaine réunion ou le prochain appel : date, heure et participants, si mentionnés.\n"
+   },
+   {
+    "name": "Entretien d’embauche",
+    "text": "## Candidat\nNom, poste actuel et employeur actuel.\n\n## Expérience et compétences\nL’expérience, les projets et les compétences pertinents mentionnés par le candidat.\n\n## Motivation\nPourquoi ce poste et cette entreprise, et pourquoi le candidat veut quitter son employeur actuel.\n\n## Salaire et conditions\nPrétentions ou fourchette salariales avec les montants exacts, préavis, date de début, horaires, télétravail, trajet, budget de formation et toute autre condition mentionnée.\n\n## Autres candidatures\nLes autres entretiens ou offres du candidat, et où il en est.\n\n## Questions du candidat\nCe que le candidat a demandé, et la réponse.\n\n## Impression\nLes points forts et les réserves apparus dans la conversation elle-même. Pas d’avis personnel.\n\n## Prochaines étapes\nLa prochaine étape : quoi, quand et qui.\n"
+   },
+   {
+    "name": "Entretien client (validation produit)",
+    "text": "## Interlocuteur\nNom, fonction et organisation, et en quoi l’interlocuteur correspond au segment cible.\n\n## Problème\nLe problème dans les mots de l’interlocuteur : sa fréquence et ce qu’il coûte (temps, argent, frustration).\n\n## Solution actuelle\nCe que l’interlocuteur fait ou utilise aujourd’hui, et ce que cela coûte.\n\n## Points de douleur\nChaque point de douleur sous forme de puce, avec une citation littérale entre guillemets.\n\n## Comportements, pas opinions\nCe que l’interlocuteur a réellement fait (cherché, acheté, construit lui-même), indépendamment de ses opinions sur un futur produit.\n\n## Disposition à payer\nLes signes que l’interlocuteur paierait ou changerait de solution, avec les montants si mentionnés. Les engagements (pilote, mise en relation, précommande) à part.\n\n## Hypothèses\nLes hypothèses sur le problème ou la solution que cette conversation confirme ou réfute. Uniquement ce que montre la conversation.\n\n## Surprises\nCe qui était inattendu.\n\n## Prochaines étapes\nLes accords et les prochaines étapes.\n"
+   },
+   {
+    "name": "Résumé général",
+    "text": "## Résumé\nLe sujet de la conversation et son principal résultat, en deux ou trois phrases.\n\n## Points clés\nLes principaux sujets, faits et points de vue, chacun sous forme de puce. Pour un point de vue, indiquez qui l’a exprimé. Reprenez les noms, chiffres, montants et dates exactement tels qu’ils ont été dits.\n\n## Accords et prochaines étapes\nCe qui a été convenu ou reste à faire : pour chaque point, qui, quoi et quand.\n\n## Questions ouvertes\nLes questions et sujets restés sans réponse ou non tranchés.\n"
+   }
+  ]
+ },
+ "it": {
+  "fileWord": "riassunto",
+  "templates": [
+   {
+    "name": "Riunione",
+    "text": "## Sintesi\nIl risultato principale della conversazione in due o tre frasi.\n\n## Decisioni\nOgni decisione in un punto elenco. Indica chi ha deciso, se è stato detto.\n\n## Azioni\nUn punto elenco per azione: chi, cosa e quando (la scadenza come è stata detta).\n\n## Domande aperte\nDomande e argomenti senza risposta o non ancora risolti.\n\n## Prossimi passi\nLa prossima riunione o chiamata: data, ora e chi, se indicati.\n"
+   },
+   {
+    "name": "Colloquio di lavoro",
+    "text": "## Candidato\nNome, ruolo attuale e datore di lavoro attuale.\n\n## Esperienza e competenze\nEsperienze, progetti e competenze rilevanti citati dal candidato.\n\n## Motivazione\nPerché questo ruolo e questa azienda, e perché il candidato vuole lasciare il datore di lavoro attuale.\n\n## Retribuzione e condizioni\nRetribuzione desiderata o fascia con gli importi esatti, preavviso, data di inizio, orario, lavoro da remoto, tragitto, budget per la formazione e ogni altra condizione citata.\n\n## Altre candidature\nAltri colloqui o offerte del candidato, e a che punto sono.\n\n## Domande del candidato\nCosa ha chiesto il candidato, e la risposta.\n\n## Impressione\nPunti di forza e dubbi emersi nella conversazione stessa. Nessuna opinione propria.\n\n## Prossimi passi\nIl passo successivo: cosa, quando e chi.\n"
+   },
+   {
+    "name": "Intervista cliente (validazione prodotto)",
+    "text": "## Intervistato\nNome, ruolo e organizzazione, e come l'intervistato rientra nel segmento target.\n\n## Problema\nIl problema con le parole dell'intervistato: quanto spesso si presenta e quanto costa (tempo, denaro, frustrazione).\n\n## Soluzione attuale\nCosa fa o usa oggi l'intervistato, e quanto costa.\n\n## Punti critici\nOgni punto critico in un punto elenco, con una citazione letterale tra virgolette.\n\n## Comportamenti, non opinioni\nCosa ha fatto davvero l'intervistato (cercato, comprato, costruito da sé), separato dalle opinioni su un prodotto futuro.\n\n## Disponibilità a pagare\nSegnali che l'intervistato pagherebbe o cambierebbe soluzione, con gli importi se citati. Gli impegni (pilota, presentazione, preordine) a parte.\n\n## Ipotesi\nQuali ipotesi sul problema o sulla soluzione questa conversazione conferma o smentisce. Solo ciò che emerge dalla conversazione.\n\n## Sorprese\nCosa è stato inatteso.\n\n## Prossimi passi\nAccordi e passi successivi.\n"
+   },
+   {
+    "name": "Riassunto generico",
+    "text": "## Sintesi\nDi cosa si è parlato e il risultato principale, in due o tre frasi.\n\n## Punti chiave\nGli argomenti, i fatti e le opinioni principali, ciascuno in un punto elenco. Per un'opinione, indica chi la sostiene. Riporta nomi, numeri, importi e date esattamente come sono stati detti.\n\n## Accordi e prossimi passi\nCosa è stato concordato o resta da fare: per ogni punto chi, cosa e quando.\n\n## Domande aperte\nDomande e argomenti senza risposta o non ancora risolti.\n"
+   }
+  ]
+ },
+ "pl": {
+  "fileWord": "podsumowanie",
+  "templates": [
+   {
+    "name": "Spotkanie",
+    "text": "## Podsumowanie\nNajważniejszy wynik rozmowy w dwóch lub trzech zdaniach.\n\n## Decyzje\nKażda decyzja jako punkt. Podaj, kto zdecydował, jeśli to padło.\n\n## Zadania\nJeden punkt na zadanie: kto, co i na kiedy (termin tak, jak padł).\n\n## Otwarte pytania\nPytania i tematy, na które nie padła odpowiedź lub których nie rozstrzygnięto.\n\n## Kolejne kroki\nNastępne spotkanie lub rozmowa: data, godzina i kto, jeśli padły.\n"
+   },
+   {
+    "name": "Rozmowa kwalifikacyjna",
+    "text": "## Kandydat\nImię i nazwisko, obecne stanowisko i obecny pracodawca.\n\n## Doświadczenie i umiejętności\nIstotne doświadczenie, projekty i umiejętności, o których mówił kandydat.\n\n## Motywacja\nDlaczego to stanowisko i ta firma oraz dlaczego kandydat chce odejść od obecnego pracodawcy.\n\n## Wynagrodzenie i warunki\nOczekiwania płacowe lub widełki z dokładnymi kwotami, okres wypowiedzenia, data rozpoczęcia, godziny, praca zdalna, dojazd, budżet szkoleniowy i inne wymienione warunki.\n\n## Inne rekrutacje\nInne rozmowy lub oferty kandydata i na jakim są etapie.\n\n## Pytania kandydata\nO co pytał kandydat i jaka padła odpowiedź.\n\n## Wrażenie\nMocne strony i wątpliwości, które wyszły w samej rozmowie. Bez własnej opinii.\n\n## Kolejne kroki\nNastępny krok: co, kiedy i kto.\n"
+   },
+   {
+    "name": "Wywiad z klientem (walidacja produktu)",
+    "text": "## Rozmówca\nImię i nazwisko, stanowisko i organizacja oraz jak rozmówca pasuje do segmentu docelowego.\n\n## Problem\nProblem słowami rozmówcy: jak często występuje i ile kosztuje (czas, pieniądze, frustracja).\n\n## Obecne rozwiązanie\nCo rozmówca robi lub czego używa dziś i ile to kosztuje.\n\n## Bolączki\nKażda bolączka jako punkt, z dosłownym cytatem w cudzysłowie.\n\n## Zachowanie, nie opinie\nCo rozmówca faktycznie zrobił (szukał, kupił, zbudował sam), oddzielnie od opinii o przyszłym produkcie.\n\n## Gotowość do zapłaty\nSygnały, że rozmówca zapłaciłby lub zmienił rozwiązanie, z kwotami, jeśli padły. Zobowiązania (pilotaż, polecenie, zamówienie przedpremierowe) osobno.\n\n## Założenia\nKtóre założenia o problemie lub rozwiązaniu ta rozmowa potwierdza lub obala. Tylko to, co wynika z rozmowy.\n\n## Zaskoczenia\nCo było nieoczekiwane.\n\n## Kolejne kroki\nUstalenia i kolejne kroki.\n"
+   },
+   {
+    "name": "Ogólne podsumowanie",
+    "text": "## Podsumowanie\nO czym była rozmowa i jaki jest jej najważniejszy wynik, w dwóch lub trzech zdaniach.\n\n## Najważniejsze punkty\nGłówne tematy, fakty i poglądy, każdy jako punkt. Przy poglądzie podaj, czyj jest. Imiona, liczby, kwoty i daty zapisz dokładnie tak, jak padły.\n\n## Ustalenia i kolejne kroki\nCo ustalono lub co jeszcze trzeba zrobić: przy każdym punkcie kto, co i na kiedy.\n\n## Otwarte pytania\nPytania i tematy, na które nie padła odpowiedź lub których nie rozstrzygnięto.\n"
+   }
+  ]
+ },
+ "pt": {
+  "fileWord": "resumo",
+  "templates": [
+   {
+    "name": "Reunião",
+    "text": "## Resumo\nO principal resultado da conversa em duas ou três frases.\n\n## Decisões\nCada decisão como um item. Diga quem decidiu, se isso foi dito.\n\n## Tarefas\nUm item por tarefa: quem, o quê e quando (o prazo como foi mencionado).\n\n## Questões em aberto\nPerguntas e assuntos que não foram respondidos nem resolvidos.\n\n## Próximos passos\nA próxima reunião ou ligação: data, horário e quem, se mencionados.\n"
+   },
+   {
+    "name": "Entrevista de emprego",
+    "text": "## Candidato\nNome, cargo atual e empregador atual.\n\n## Experiência e habilidades\nExperiência, projetos e habilidades relevantes que o candidato mencionou.\n\n## Motivação\nPor que esta vaga e esta empresa, e por que o candidato quer deixar o empregador atual.\n\n## Salário e condições\nPretensão ou faixa salarial com os valores exatos, aviso prévio, data de início, jornada, trabalho remoto, deslocamento, verba para cursos e outras condições mencionadas.\n\n## Outros processos seletivos\nOutras entrevistas ou propostas que o candidato tem, e em que fase estão.\n\n## Perguntas do candidato\nO que o candidato perguntou, e a resposta.\n\n## Impressão\nPontos fortes e preocupações que surgiram na própria conversa. Sem opinião própria.\n\n## Próximos passos\nO próximo passo: o quê, quando e quem.\n"
+   },
+   {
+    "name": "Entrevista com cliente (validação de produto)",
+    "text": "## Entrevistado\nNome, cargo e organização, e como o entrevistado se encaixa no público-alvo.\n\n## Problema\nO problema nas palavras do entrevistado: com que frequência acontece e quanto custa (tempo, dinheiro, frustração).\n\n## Solução atual\nO que o entrevistado faz ou usa hoje, e quanto isso custa.\n\n## Dores\nCada dor como um item, com uma citação literal entre aspas.\n\n## Comportamento, não opiniões\nO que o entrevistado de fato fez (pesquisou, comprou, construiu por conta própria), separado de opiniões sobre um produto futuro.\n\n## Disposição a pagar\nSinais de que o entrevistado pagaria ou trocaria de solução, com valores se mencionados. Compromissos (piloto, indicação, pré-venda) à parte.\n\n## Hipóteses\nQuais hipóteses sobre o problema ou a solução esta conversa confirma ou refuta. Só o que a conversa mostra.\n\n## Surpresas\nO que foi inesperado.\n\n## Próximos passos\nCombinados e próximos passos.\n"
+   },
+   {
+    "name": "Resumo geral",
+    "text": "## Resumo\nSobre o que foi a conversa e seu principal resultado, em duas ou três frases.\n\n## Pontos principais\nOs principais assuntos, fatos e opiniões, cada um como um item. Para uma opinião, diga quem a defendeu. Mantenha nomes, números, valores e datas exatamente como foram ditos.\n\n## Combinados e próximos passos\nO que foi combinado ou ainda precisa ser feito: para cada ponto, quem, o quê e quando.\n\n## Questões em aberto\nPerguntas e assuntos que não foram respondidos nem resolvidos.\n"
+   }
+  ]
+ },
+ "ru": {
+  "fileWord": "изложение",
+  "templates": [
+   {
+    "name": "Совещание",
+    "text": "## Итог\nГлавный итог разговора в двух-трёх предложениях.\n\n## Решения\nКаждое решение отдельным пунктом. Укажите, кто решил, если это прозвучало.\n\n## Задачи\nПо пункту на задачу: кто, что и когда (срок, как его назвали).\n\n## Открытые вопросы\nВопросы и темы, которые остались без ответа или не решены.\n\n## Дальнейшие шаги\nСледующая встреча или созвон: дата, время и участники, если это прозвучало.\n"
+   },
+   {
+    "name": "Собеседование",
+    "text": "## Кандидат\nИмя, текущая должность и текущий работодатель.\n\n## Опыт и навыки\nОпыт, проекты и навыки по теме, которые назвал кандидат.\n\n## Мотивация\nПочему именно эта должность и эта компания и почему кандидат хочет уйти от нынешнего работодателя.\n\n## Зарплата и условия\nОжидания по зарплате или вилка с точными суммами, срок увольнения, дата выхода, часы, удалённая работа, дорога, бюджет на обучение и другие названные условия.\n\n## Другие собеседования\nДругие собеседования или предложения у кандидата и на какой они стадии.\n\n## Вопросы кандидата\nЧто спросил кандидат и какой был ответ.\n\n## Впечатление\nСильные стороны и сомнения, которые прозвучали в самом разговоре. Без собственной оценки.\n\n## Дальнейшие шаги\nСледующий шаг: что, когда и кто.\n"
+   },
+   {
+    "name": "Интервью с клиентом (проверка продукта)",
+    "text": "## Собеседник\nИмя, роль и организация, и насколько собеседник соответствует целевому сегменту.\n\n## Проблема\nПроблема словами собеседника: как часто она возникает и чего стоит (время, деньги, раздражение).\n\n## Текущее решение\nЧто собеседник делает или использует сейчас и сколько это стоит.\n\n## Боли\nКаждая боль отдельным пунктом, с дословной цитатой в кавычках.\n\n## Поведение, а не мнения\nЧто собеседник действительно сделал (искал, купил, сделал сам), отдельно от мнений о будущем продукте.\n\n## Готовность платить\nПризнаки того, что собеседник заплатит или перейдёт, с суммами, если они прозвучали. Обязательства (пилот, знакомство, предзаказ) отдельно.\n\n## Гипотезы\nКакие гипотезы о проблеме или решении этот разговор подтверждает или опровергает. Только то, что следует из разговора.\n\n## Неожиданное\nЧто оказалось неожиданным.\n\n## Дальнейшие шаги\nДоговорённости и следующие шаги.\n"
+   },
+   {
+    "name": "Общее резюме",
+    "text": "## Итог\nО чём был разговор и каков главный итог, в двух-трёх предложениях.\n\n## Главное\nОсновные темы, факты и мнения, каждое отдельным пунктом. Для мнения укажите, чьё оно. Имена, числа, суммы и даты приводите точно так, как они прозвучали.\n\n## Договорённости и дальнейшие шаги\nО чём договорились и что ещё нужно сделать: по каждому пункту кто, что и когда.\n\n## Открытые вопросы\nВопросы и темы, которые остались без ответа или не решены.\n"
+   }
+  ]
+ },
+ "uk": {
+  "fileWord": "підсумок",
+  "templates": [
+   {
+    "name": "Нарада",
+    "text": "## Підсумок\nГоловний результат розмови у двох-трьох реченнях.\n\n## Рішення\nКожне рішення окремим пунктом. Укажіть, хто ухвалив, якщо це прозвучало.\n\n## Завдання\nОдин пункт на завдання: хто, що і коли (термін, як його названо).\n\n## Відкриті питання\nПитання й теми, на які не відповіли або які не вирішили.\n\n## Наступні кроки\nНаступна зустріч або дзвінок: дата, час і хто, якщо це згадано.\n"
+   },
+   {
+    "name": "Співбесіда",
+    "text": "## Кандидат\nІм’я, поточна посада й поточний роботодавець.\n\n## Досвід і навички\nДоречний досвід, проєкти й навички, які назвав кандидат.\n\n## Мотивація\nЧому ця посада й ця компанія і чому кандидат хоче піти від поточного роботодавця.\n\n## Зарплата й умови\nОчікувана зарплата або діапазон із точними сумами, строк попередження про звільнення, дата початку, години, віддалена робота, дорога, бюджет на навчання та інші згадані умови.\n\n## Інші пропозиції\nІнші співбесіди чи пропозиції кандидата і на якому вони етапі.\n\n## Запитання кандидата\nЩо запитав кандидат і яку відповідь отримав.\n\n## Враження\nСильні сторони й сумніви, що прозвучали в самій розмові. Без власної оцінки.\n\n## Наступні кроки\nНаступний крок: що, коли і хто.\n"
+   },
+   {
+    "name": "Інтерв’ю з клієнтом (перевірка продукту)",
+    "text": "## Співрозмовник\nІм’я, посада й організація, а також як співрозмовник відповідає цільовому сегменту.\n\n## Проблема\nПроблема словами співрозмовника: як часто вона виникає і чого коштує (час, гроші, роздратування).\n\n## Поточне рішення\nЩо співрозмовник робить або використовує сьогодні і скільки це коштує.\n\n## Больові точки\nКожна больова точка окремим пунктом, із дослівною цитатою в лапках.\n\n## Поведінка, а не думки\nЩо співрозмовник справді робив (шукав, купував, створював сам), окремо від думок про майбутній продукт.\n\n## Готовність платити\nОзнаки, що співрозмовник платив би або перейшов, із сумами, якщо їх названо. Зобов’язання (пілот, знайомство, передзамовлення) окремо.\n\n## Припущення\nЯкі припущення щодо проблеми чи рішення ця розмова підтверджує або спростовує. Лише те, що видно з розмови.\n\n## Несподіванки\nЩо було несподіваним.\n\n## Наступні кроки\nДомовленості й наступні кроки.\n"
+   },
+   {
+    "name": "Загальний підсумок",
+    "text": "## Підсумок\nПро що була розмова і її головний результат, у двох-трьох реченнях.\n\n## Ключові моменти\nГоловні теми, факти й погляди, кожен окремим пунктом. Для погляду вкажіть, чий він. Імена, числа, суми й дати наводьте точно так, як їх названо.\n\n## Домовленості й наступні кроки\nПро що домовилися або що ще треба зробити: для кожного пункту хто, що і коли.\n\n## Відкриті питання\nПитання й теми, на які не відповіли або які не вирішили.\n"
+   }
+  ]
+ },
+ "nl": {
+  "fileWord": "samenvatting",
+  "templates": [
+   {
+    "name": "Vergadering",
+    "text": "## Kern\nDe belangrijkste uitkomst van het gesprek in twee of drie zinnen.\n\n## Besluiten\nElk besluit als opsommingsteken. Noem wie het besloot, als dat gezegd is.\n\n## Actiepunten\nPer actiepunt een opsommingsteken: wie, wat en wanneer (de deadline zoals genoemd).\n\n## Open vragen\nVragen en onderwerpen die nog niet beantwoord of afgerond zijn.\n\n## Vervolg\nDe volgende afspraak of het volgende overleg: datum, tijd en wie, als dat genoemd is.\n"
+   },
+   {
+    "name": "Sollicitatiegesprek",
+    "text": "## Kandidaat\nNaam, huidige functie en huidige werkgever.\n\n## Ervaring en vaardigheden\nRelevante ervaring, projecten en vaardigheden die de kandidaat noemde.\n\n## Motivatie\nWaarom deze functie en dit bedrijf, en waarom de kandidaat weg wil bij de huidige werkgever.\n\n## Salaris en voorwaarden\nSalariswens of bandbreedte met de exacte bedragen, opzegtermijn, startdatum, uren, thuiswerken, reistijd, opleidingsbudget en andere voorwaarden die genoemd zijn.\n\n## Andere sollicitaties\nAndere gesprekken of aanbiedingen van de kandidaat, en hoe ver die zijn.\n\n## Vragen van de kandidaat\nWat de kandidaat zelf vroeg, en het antwoord.\n\n## Indruk\nSterke punten en zorgen die in het gesprek zelf naar voren kwamen. Geen eigen oordeel.\n\n## Vervolgafspraken\nDe volgende stap: wat, wanneer en wie.\n"
+   },
+   {
+    "name": "Klantinterview (productvalidatie)",
+    "text": "## Geïnterviewde\nNaam, rol en organisatie, en hoe de geïnterviewde in de doelgroep past.\n\n## Probleem\nHet probleem in de woorden van de geïnterviewde: hoe vaak het voorkomt en wat het kost (tijd, geld, ergernis).\n\n## Huidige oplossing\nWat de geïnterviewde nu doet of gebruikt, en wat dat kost.\n\n## Pijnpunten\nElk pijnpunt als opsommingsteken, met een letterlijk citaat tussen aanhalingstekens.\n\n## Gedrag, niet meningen\nWat de geïnterviewde echt heeft gedaan (gezocht, gekocht, zelf gebouwd), apart van meningen over een toekomstig product.\n\n## Betalingsbereidheid\nSignalen dat de geïnterviewde zou betalen of overstappen, met bedragen als die genoemd zijn. Toezeggingen (pilot, introductie, voorbestelling) apart.\n\n## Aannames\nWelke aannames over het probleem of de oplossing dit gesprek bevestigt of ontkracht. Alleen wat uit het gesprek blijkt.\n\n## Verrassingen\nWat onverwacht was.\n\n## Vervolg\nAfspraken en volgende stappen.\n"
+   },
+   {
+    "name": "Algemene samenvatting",
+    "text": "## Kern\nWaar het gesprek over ging en wat de belangrijkste uitkomst is, in twee of drie zinnen.\n\n## Belangrijkste punten\nDe belangrijkste onderwerpen, feiten en standpunten, elk als opsommingsteken. Noem bij een standpunt wie het innam. Neem namen, getallen, bedragen en data letterlijk over.\n\n## Afspraken en vervolg\nWat is afgesproken of nog moet gebeuren: per punt wie, wat en wanneer.\n\n## Open punten\nVragen en onderwerpen die nog niet beantwoord of afgerond zijn.\n"
+   }
+  ]
+ }
+}

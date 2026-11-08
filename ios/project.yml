@@ -1,0 +1,205 @@
+name: Bandje
+options:
+  bundleIdPrefix: com.neurendal
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  # Icon Composer documents (AppIcon.icon) are one file to Xcode, not a folder of sources.
+  fileTypes:
+    icon:
+      file: true
+      buildPhase: resources
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: KKWHW59YC3
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "3"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+
+packages:
+  desert-ant-core:
+    url: https://github.com/Desert-Ant-Labs/desert-ant-core.git
+    exactVersion: "4.2.3"
+
+targets:
+  Bandje:
+    type: application
+    platform: iOS
+    sources:
+      - path: Bandje
+      - path: Shared
+    dependencies:
+      - package: desert-ant-core
+        product: Voz
+      - package: desert-ant-core
+        product: Who
+      - target: BandjeShare
+      - target: BandjeWidgets
+    entitlements:
+      path: Bandje/Bandje.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.neurendal.bandje]
+        # Opt-in sync via iCloud Drive (docs/icloud-sync.md); no CloudKit.
+        com.apple.developer.icloud-container-identifiers: [iCloud.com.neurendal.bandje]
+        com.apple.developer.ubiquity-container-identifiers: [iCloud.com.neurendal.bandje]
+        com.apple.developer.icloud-services: [CloudDocuments]
+    info:
+      path: Bandje/Info.plist
+      properties:
+        CFBundleDisplayName: "Band·je"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, nl, de, fr, es, it, pt, pl, ru, uk]
+        # Siri can't say "Band·je": "Bandje" keeps "Neem op met Bandje" working.
+        INAlternativeAppNames:
+          - INAlternativeAppName: Bandje
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: "Band·je records with the microphone. Recordings stay on your device, or in your own iCloud Drive if you turn on sync."
+        # Only when "Save location" is on (off by default).
+        NSLocationWhenInUseUsageDescription: "Band·je saves where a recording was made, when you turn this on. The location stays with the recording on your device."
+        UIBackgroundModes: [audio]
+        # Live Activity / Dynamic Island while recording (SPEC 4).
+        NSSupportsLiveActivities: true
+        # Transcription keeps running after leaving the app (BGContinuedProcessingTask, SPEC 6).
+        BGTaskSchedulerPermittedIdentifiers: [com.neurendal.bandje.transcribe.*]
+        UIFileSharingEnabled: true
+        # iCloud Drive › Bandje when "Sync with iCloud" is on.
+        NSUbiquitousContainers:
+          iCloud.com.neurendal.bandje:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            # The folder's name in iCloud Drive (owner, 6 Nov): Band·je (U+00B7). iCloud only picks up a
+            # new name with a new CFBundleVersion.
+            NSUbiquitousContainerName: "Band·je"
+            NSUbiquitousContainerSupportedFolderLevels: Any
+        LSSupportsOpeningDocumentsInPlace: true
+        # "Open in" / "Copy to Bandje" for any audio or video (SPEC 5).
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Audio
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.audio]
+          - CFBundleTypeName: Video
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.movie]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    postBuildScripts:
+      - name: Verify and copy models
+        script: python3 "$SRCROOT/scripts/verify-and-copy-models.py" copy "$HOME/Music/Bandje/.models" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models"
+        basedOnDependencyAnalysis: false
+
+  BandjeShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+    entitlements:
+      path: ShareExtension/BandjeShare.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.neurendal.bandje]
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: "Band·je"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, nl, de, fr, es, it, pt, pl, ru, uk]
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # Any shared item with audio or video (Voice Memos, WhatsApp, Notes, Files, Safari).
+            NSExtensionActivationRule: >-
+              SUBQUERY(extensionItems, $item, SUBQUERY($item.attachments, $a,
+              ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audiovisual-content").@count >= 1).@count >= 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje.share
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+
+  BandjeWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: Shared
+    entitlements:
+      path: Widgets/BandjeWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.neurendal.bandje]
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: "Band·je"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, nl, de, fr, es, it, pt, pl, ru, uk]
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje.widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+        # The shared intents do their work only in the app (Shared/RecordingIntents.swift).
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
+
+  BandjeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: BandjeTests
+    dependencies:
+      - target: Bandje
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Bandje.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Bandje"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  BandjeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: BandjeUITests
+    dependencies:
+      - target: Bandje
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Bandje
+
+schemes:
+  Bandje:
+    build:
+      targets:
+        Bandje: all
+        BandjeTests: [test]
+        BandjeUITests: [test]
+    test:
+      gatherCoverageData: false
+      targets:
+        - BandjeTests
+        - BandjeUITests
