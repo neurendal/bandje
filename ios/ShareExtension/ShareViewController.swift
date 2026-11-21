@@ -21,8 +21,13 @@ final class ShareViewController: UIViewController {
         host.didMove(toParent: self)
     }
 
+    /// `viewDidAppear` can come more than once (the sheet re-presented): copy the files only once.
+    private var started = false
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        guard !started else { return }
+        started = true
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
         Task {
             var added = 0

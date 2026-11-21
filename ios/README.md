@@ -9,6 +9,7 @@ Want it without building? [Get Bandje on the App Store](https://apps.apple.com/a
 ## Requirements
 
 - Xcode 27 (the app runs on iOS 26 and later, but uses iOS 27 APIs where available), and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`xcodegen`)
+- `bandje-core` (the shared package BandjeKit) next to this folder: `../bandje-core`
 - An iOS 26 simulator (the Makefile picks the first "iPhone 17 Pro"), or a device
 - About 400 MB for the speech models
 

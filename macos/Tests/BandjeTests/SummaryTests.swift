@@ -86,6 +86,44 @@ struct SummaryTests {
         #expect(Summaries.templates(in: other).first?.text == "van mij")
     }
 
+    /// The later example comes once in total, in one language: another app language (a selftest run
+    /// in Dutch, a language switch in Settings) adds nothing next to it.
+    @Test func laterExampleComesOnceInOneLanguage() throws {
+        func names(_ dir: URL) -> [String] { Summaries.templates(in: dir).map(\.name) }
+        // A fresh folder in English: only the English examples, and a later Dutch run adds nothing.
+        let fresh = temp().appendingPathComponent("Templates")
+        let d1 = UserDefaults(suiteName: "seed-\(UUID().uuidString)")!
+        Summaries.seedIfMissing(fresh, language: "en", defaults: d1)
+        let english = Summaries.examples(language: "en").map(\.name).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        #expect(names(fresh) == english)
+        Summaries.seedIfMissing(fresh, language: "nl", defaults: d1)
+        #expect(names(fresh) == english)
+
+        // An existing folder: run in English, then in Dutch: only the English one.
+        let existing = temp().appendingPathComponent("Templates")
+        try FileManager.default.createDirectory(at: existing, withIntermediateDirectories: true)
+        try "own".write(to: existing.appendingPathComponent("Mine.md"), atomically: true, encoding: .utf8)
+        let d2 = UserDefaults(suiteName: "seed-\(UUID().uuidString)")!
+        Summaries.seedIfMissing(existing, language: "en", defaults: d2)
+        #expect(names(existing) == ["Generic summary", "Mine"])
+        Summaries.seedIfMissing(existing, language: "nl", defaults: d2)
+        Summaries.seedIfMissing(existing, language: "de", defaults: d2)
+        #expect(names(existing) == ["Generic summary", "Mine"])
+
+        // Language switch with the example already there (flags lost, e.g. another Mac via iCloud):
+        // a later example in any language counts, nothing new; also after it was deleted.
+        let synced = temp().appendingPathComponent("Templates")
+        try FileManager.default.createDirectory(at: synced, withIntermediateDirectories: true)
+        try "## X".write(to: synced.appendingPathComponent("Algemene samenvatting.md"), atomically: true, encoding: .utf8)
+        let d3 = UserDefaults(suiteName: "seed-\(UUID().uuidString)")!
+        Summaries.seedIfMissing(synced, language: "en", defaults: d3)
+        #expect(names(synced) == ["Algemene samenvatting"])
+        try FileManager.default.removeItem(at: synced.appendingPathComponent("Algemene samenvatting.md"))
+        Summaries.seedIfMissing(synced, language: "fr", defaults: d3)
+        #expect(names(synced).isEmpty)
+        #expect(Summaries.laterExamples.allSatisfy { d3.bool(forKey: "templateAdded." + $0) })
+    }
+
     @Test func interviewExampleAsksForTheDetailsTheSpikeMissed() {
         let t = Summaries.examples(language: "nl").first { $0.name == "Sollicitatiegesprek" }!
         for word in ["Salariswens", "exacte bedragen", "Andere sollicitaties", "opleidingsbudget", "Vervolgafspraken"] {

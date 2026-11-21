@@ -69,14 +69,17 @@ enum Summaries {
         return found.isEmpty ? examples(language: language) : found
     }
 
-    /// Creates `folder` with the three examples when it does not exist yet; an existing folder
-    /// (also an empty one) is the user's and stays as it is (as on the Mac).
-    static func seedIfMissing(_ folder: URL = templatesFolder, language: String = appLanguage) {
+    /// Creates `folder` with the examples when it does not exist yet; an existing folder (also an
+    /// empty one) is the user's and stays as it is (as on the Mac). A new folder has the later
+    /// example already, so `addLaterExamples` adds nothing to it, in no language.
+    static func seedIfMissing(_ folder: URL = templatesFolder, language: String = appLanguage,
+                              defaults: UserDefaults = .standard) {
         guard !FileManager.default.fileExists(atPath: folder.path) else { return }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for t in examples(language: language) {
             try? Data(t.text.utf8).write(to: folder.appending(path: t.name + ".md"), options: .withoutOverwriting)
         }
+        for name in laterExamples { defaults.set(true, forKey: "templateAdded.\(name)") }
     }
 
     /// Writes a template (new or edited) as `<name>.md`; renaming removes the old file.
@@ -100,14 +103,29 @@ enum Summaries {
     /// existing folder (never over a file of that name), so people who had the folder get them too.
     static var laterExamples: Set<String> { Set(catalog.values.compactMap { $0.templates.count > 3 ? $0.templates[3].name : nil }) }
 
+    /// The later example goes into an existing folder once in total, in one language (as on the
+    /// Mac): not when the folder already has it in any language, and never again after that. The
+    /// flags of every language's name are set together, so another app language adds nothing.
     static func addLaterExamples(in folder: URL = templatesFolder, language: String = appLanguage,
                                  defaults: UserDefaults = .standard) {
         guard FileManager.default.fileExists(atPath: folder.path) else { return }
-        for t in examples(language: language) where laterExamples.contains(t.name) {
-            let key = "templateAdded.\(t.name)"
-            guard !defaults.bool(forKey: key) else { continue }
+        let flags = laterExamples.map { "templateAdded.\($0)" }
+        guard !flags.contains(where: { defaults.bool(forKey: $0) }) else { return }
+        if !containsLaterExample(folder), let t = examples(language: language).first(where: { laterExamples.contains($0.name) }) {
             try? Data(t.text.utf8).write(to: folder.appending(path: t.name + ".md"), options: .withoutOverwriting)
-            defaults.set(true, forKey: key)
+        }
+        for key in flags { defaults.set(true, forKey: key) }
+    }
+
+    /// True when `folder` has a later example in any language (`.md`/`.txt`, also an iCloud
+    /// placeholder of one that is not downloaded yet).
+    static func containsLaterExample(_ folder: URL) -> Bool {
+        let names = Set(((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).map { $0.lowercased() })
+        return laterExamples.contains { name in
+            ["md", "txt"].contains { ext in
+                let file = (name + "." + ext).lowercased()
+                return names.contains(file) || names.contains("." + file + ".icloud")
+            }
         }
     }
 
@@ -304,7 +322,10 @@ enum Summaries {
 
     /// The summary of a recording folder: the newest `<name> <word>[ <template>].md` (Mac or iPhone),
     /// so a summary with another template shows right after it was made.
-    static func file(in folder: URL) -> URL? {
+    static func file(in folder: URL) -> URL? { files(in: folder).first }
+
+    /// All summaries of a recording folder, newest first (the first is `file(in:)`).
+    static func files(in folder: URL) -> [URL] {
         let fm = FileManager.default
         let prefix = folder.lastPathComponent + " "
         let files = ((try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
@@ -312,7 +333,30 @@ enum Summaries {
         func modified(_ url: URL) -> Date {
             (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
         }
-        return files.max { (modified($0), $1.lastPathComponent) < (modified($1), $0.lastPathComponent) }
+        return files.sorted { (modified($1), $0.lastPathComponent) < (modified($0), $1.lastPathComponent) }
+    }
+
+    /// A summary as it goes into a shared document (specs/share.md): its heading ("Summary ·
+    /// Meeting"), its label in the chooser (the template's name only, as on the Mac), and its body.
+    struct Part: Equatable, Sendable, Identifiable {
+        var file: URL
+        var heading: String
+        var name: String
+        var body: String
+        var id: URL { file }
+    }
+
+    static func part(_ file: URL, markdown md: String, in folder: URL) -> Part {
+        let template = templateName(of: file, in: folder)
+        let heading = template.map { String(localized: "Summary · \($0)") } ?? String(localized: "Summary")
+        return Part(file: file, heading: heading, name: template ?? String(localized: "Summary"), body: body(ofDocument: md))
+    }
+
+    /// The summaries for sharing, newest first; unreadable ones (still in iCloud) are left out.
+    static func parts(in folder: URL) -> [Part] {
+        files(in: folder).compactMap { file in
+            (try? String(contentsOf: file, encoding: .utf8)).map { part(file, markdown: $0, in: folder) }
+        }
     }
 
     /// The template a summary file was made with, from its name (`<name> samenvatting <template>.md`).
@@ -346,6 +390,23 @@ enum Summaries {
         case heading(String)
         case bullet(String)
         case paragraph(String)
+    }
+
+    /// A block's text without its Markdown (bold, italic, links), for copying.
+    static func plainText(_ block: Block) -> String {
+        switch block {
+        case .heading(let s), .bullet(let s), .paragraph(let s):
+            (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+                .map { String($0.characters) } ?? s
+        }
+    }
+
+    /// A summary's body as plain text: no Markdown marks, bullets as "•".
+    static func plainText(_ body: String) -> String {
+        blocks(body).map { block in
+            if case .bullet = block { return "• " + plainText(block) }
+            return plainText(block)
+        }.joined(separator: "\n")
     }
 
     static func blocks(_ body: String) -> [Block] {
@@ -412,12 +473,13 @@ enum OnDeviceSummarizer {
         let context = SystemLanguageModel.default.contextSize
         // Room for the instructions (±500 tokens) and the answer (±1000).
         var budget = max(800, context - 1600)
-        for attempt in 0..<3 {
+        for _ in 0..<3 {
             do {
                 return try await run(lines, template: template, language: language, budget: budget, progress: progress)
             } catch let error as LanguageModelSession.GenerationError {
-                if case .exceededContextWindowSize = error, attempt < 2 { budget = budget * 2 / 3; continue }
-                throw TranscriptionError(message: describe(error))
+                guard case .exceededContextWindowSize = error else { throw TranscriptionError(message: describe(error)) }
+                // Smaller parts next time; after the third overflow it is too long.
+                budget = budget * 2 / 3
             }
         }
         throw TranscriptionError(message: String(localized: "This conversation is too long to summarise."))
@@ -499,10 +561,13 @@ final class SummaryJobs {
     private(set) var generation = 0
 
     private var tasks: [URL: Task<Void, Never>] = [:]
+    /// Which job owns a folder's entries: a cancelled queued job must not clear a newer one's.
+    private var jobs: [URL: UUID] = [:]
     private var last: Task<Void, Never>?
 
     func fraction(of folder: URL) -> Double? { progress[folder.standardizedFileURL] }
     func isRunning(_ folder: URL) -> Bool { fraction(of: folder) != nil }
+    var isBusy: Bool { !progress.isEmpty }
 
     /// Starts (or queues) a summary of the transcript in `recording`; replaces an older summary
     /// only when the new one is done.
@@ -513,26 +578,38 @@ final class SummaryJobs {
         progress[folder] = 0
         Summaries.lastTemplate = template.name
         let previous = last
+        let job = UUID()
         let task = Task { [weak self] in
             await previous?.value
-            await self?.run(folder: folder, json: json, title: recording.title, old: recording.summary, template: template)
+            await self?.run(folder: folder, json: json, title: recording.title, old: recording.summary, template: template, job: job)
         }
         tasks[folder] = task
+        jobs[folder] = job
         last = task
     }
 
     func cancel(_ folder: URL) {
-        tasks[folder.standardizedFileURL]?.cancel()
+        let folder = folder.standardizedFileURL
+        tasks[folder]?.cancel()
+        // A job that has not begun yet is gone at once (it only waits for the one before it).
+        if progress[folder] == 0 {
+            progress[folder] = nil
+            tasks[folder] = nil
+            jobs[folder] = nil
+        }
     }
 
     func wait(_ folder: URL) async {
         await tasks[folder.standardizedFileURL]?.value
     }
 
-    private func run(folder: URL, json: URL, title: String, old: URL?, template: Summaries.Template) async {
+    private func run(folder: URL, json: URL, title: String, old: URL?, template: Summaries.Template, job: UUID) async {
         defer {
-            progress[folder] = nil
-            tasks[folder] = nil
+            if jobs[folder] == job {
+                progress[folder] = nil
+                tasks[folder] = nil
+                jobs[folder] = nil
+            }
         }
         guard !Task.isCancelled else { return }
         do {

@@ -1,4 +1,5 @@
 import AudioToolbox
+import AVFoundation
 import Foundation
 import Testing
 @testable import Bandje
@@ -13,6 +14,22 @@ final class OutputTests {
     }
 
     deinit { try? FileManager.default.removeItem(at: dir) }
+
+    /// A recording that could not start: its `.caf` goes, and its folder too when only
+    /// `.bandje.json` is left; a folder with anything else in it stays.
+    @Test func unstartedRecordingLeavesNoFolder() throws {
+        let caf = try OutputLocation.newRecording(title: "Opname", date: Date(), in: dir)
+        FileManager.default.createFile(atPath: caf.path, contents: Data())
+        Recorder.removeUnstarted(caf)
+        #expect(!FileManager.default.fileExists(atPath: caf.deletingLastPathComponent().path))
+
+        let other = try OutputLocation.newRecording(title: "Ander", date: Date(), in: dir)
+        let keep = other.deletingLastPathComponent().appendingPathComponent("notes.txt")
+        try Data("x".utf8).write(to: keep)
+        Recorder.removeUnstarted(other)
+        #expect(!FileManager.default.fileExists(atPath: other.path))
+        #expect(FileManager.default.fileExists(atPath: keep.path))
+    }
 
     @Test func iPhoneJsonRoundTripKeepsUnknownKeys() throws {
         // As the iPhone writes it: no channel, markers/recorded/location, a key nobody knows yet.
@@ -165,8 +182,8 @@ final class OutputTests {
     @Test func publishAvoidsNameClash() throws {
         let target = dir.appendingPathComponent("cloud")
         try FileManager.default.createDirectory(at: target.appendingPathComponent("Opname 6 nov 14.32"), withIntermediateDirectories: true)
-        #expect(ICloudSync.publishName(for: "Opname 6 nov 14.32", in: target) == "Opname 6 nov 14.32 2")
-        #expect(ICloudSync.publishName(for: "Memo", in: target) == "Memo")
+        #expect(OutputLocation.uniqueName("Opname 6 nov 14.32", in: target) == "Opname 6 nov 14.32 2")
+        #expect(OutputLocation.uniqueName("Memo", in: target) == "Memo")
     }
 
     @Test func stagingPlanMovesOnlyFinishedRecordings() throws {
@@ -222,6 +239,35 @@ final class OutputTests {
         try RecordingMeta(created: Date(timeIntervalSince1970: 1_000)).write(to: phone)
         #expect(OutputLocation.recordingDate(phone.appendingPathComponent("Opname 6 nov 14.32.json")) == Date(timeIntervalSince1970: 1_000))
         #expect(!OutputLocation.isOwnRecording(phone.appendingPathComponent("Opname 6 nov 14.32.m4a")))  // no stereo file: iPhone
+    }
+
+    /// Transcribe File…: the copy gets a `.bandje.json` marked imported, so markers work and a
+    /// stereo file is never split into me and the other side; a file the Mac can read stays as it is.
+    @Test func importedStereoFileIsMarkedAndNeverOwn() async throws {
+        let source = dir.appendingPathComponent("Gesprek.caf")
+        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+        do {
+            let file = try AVAudioFile(forWriting: source, settings: format.settings)
+            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)!
+            buffer.frameLength = 48_000
+            try file.write(from: buffer)
+        }
+        let target = dir.appendingPathComponent("recordings")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        let (folder, copy) = OutputLocation.importFolder(for: source, in: target)
+        let audio = try await OutputLocation.prepareImport(folder: folder, copy: copy, original: source)
+        #expect(audio == copy)  // readable audio: kept as it is
+        #expect(RecordingMeta.read(from: folder)?.imported == true)
+        #expect(RecordingMeta.read(from: folder)?.duration == RecordingMeta.storedDuration(Library.audioDuration(audio) ?? 0))
+        #expect(RecordingMeta.read(from: folder)?.duration != nil)
+        #expect(!OutputLocation.isOwnRecording(audio))
+        // The same stereo file without the mark would count as a Mac recording.
+        var meta = try #require(RecordingMeta.read(from: folder))
+        meta.imported = nil
+        try meta.write(to: folder)
+        #expect(OutputLocation.isOwnRecording(audio))
+        // Transcribing it again in its own folder changes nothing.
+        #expect(try await OutputLocation.prepareImport(folder: folder, copy: audio, original: audio) == audio)
     }
 
     @Test func elapsedString() {

@@ -21,6 +21,16 @@ struct WebExportTests {
         return dir
     }
 
+    /// A marker under its turn, clickable (plays from there), with its note.
+    @Test func pageShowsMarkers() {
+        var t = transcript()
+        t.markers = [1]
+        t.markerNotes = ["1.0": "Let <op>"]
+        let html = WebExport.page(t, summaries: [], audio: nil, logoBase64: nil)
+        let marker = "<div class=\"marker\"><a class=\"t\" data-t=\"1.0\">🚩 0:01</a> <span>Let &lt;op&gt;</span></div>"
+        #expect(html.contains("welkom</p></div>\n" + marker))
+    }
+
     @Test func pageIsSelfContainedAndBranded() {
         var t = transcript()
         t.title = "Opname 6 nov 14.32"

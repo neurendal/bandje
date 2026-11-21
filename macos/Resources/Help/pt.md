@@ -8,7 +8,7 @@ O Band·je grava duas coisas ao mesmo tempo: seu microfone e todo o som que o se
 
 - Durante a gravação, a fita na barra de menus fica vermelha, os rolos giram e o tempo corre ao lado, em vermelho.
 - O seu Mac não entra em repouso enquanto o Band·je grava.
-- Na primeira vez, o macOS pede permissão para gravar o áudio do seu Mac. Permita, senão o Band·je só ouve o seu microfone.
+- O macOS pede permissão para gravar o áudio do seu Mac quando você clica em **Permitir…** nas boas-vindas ou em Ajustes › Acesso, ou então na primeira gravação. Permita, senão o Band·je só ouve o seu microfone. No início de cada gravação, o Band·je verifica isso em silêncio e avisa você na hora se estiver desativado.
 - Se o microfone ficar em silêncio por seis segundos, ou se a tampa for fechada enquanto o microfone interno está em uso, o Band·je avisa você e oferece trocar para outro microfone.
 
 Avise as outras pessoas de que você está gravando. Em alguns países, e em uso profissional, a lei exige isso e, às vezes, também é preciso o consentimento delas. Você é responsável por cumprir a lei que se aplica a você. O Band·je lembra você uma vez, antes da primeira gravação.
@@ -50,33 +50,30 @@ Numa linha telefônica com menu ou música de espera, o Band·je às vezes ouve 
 ## A janela do Band·je {#player}
 Todas as suas gravações numa janela: ouvir, acompanhar a leitura, buscar, nomear falantes, resumir e compartilhar.
 
-Escolha **Abrir o Band·je** no menu (⌘O). A janela também abre quando você mesmo abre o Band·je, por exemplo pelo Launchpad ou pelo Spotlight. **Abrir no Band·je** abre a gravação atual. Enquanto a janela está aberta, o Band·je fica no Dock e no ⌘Tab; feche-a e o Band·je volta a ficar só na barra de menus. Ative **Sempre no Dock** em [Ajustes](#settings) para manter o ícone. Na primeira vez, a janela abre sempre, com as permissões, cada uma com o seu botão. Se você fechar a janela, o Band·je fica na barra de menus; encerre o Band·je por esse menu.
+Escolha **Abrir o Band·je** no menu (⌘O). A janela também abre quando você mesmo abre o Band·je, por exemplo pelo Launchpad ou pelo Spotlight. **Abrir no Band·je** abre a gravação atual. Enquanto a janela está aberta, o Band·je fica no Dock e no ⌘Tab; feche-a e o Band·je volta a ficar só na barra de menus. Ative **Sempre no Dock** em [Ajustes](#settings) para manter o ícone. Na primeira vez, a janela abre sempre com uma boas-vindas em dois passos: primeiro os atalhos, depois **Próximo** para as permissões, cada uma com o seu botão. Se você fechar a janela, o Band·je fica na barra de menus; encerre o Band·je por esse menu.
 
 - À esquerda: suas gravações por dia, com a hora, a duração e as primeiras palavras da transcrição. A busca encontra títulos e palavras nas transcrições. Embaixo fica **Iniciar gravação**; enquanto você grava, a nova gravação aparece no topo com um ponto vermelho e, ao parar, a janela a abre.
 - À direita: a gravação com a fita cassete, a barra de posição e o botão de reprodução (barra de espaço). Clique numa frase para ouvir a partir dali; durante a reprodução, a frase que você está ouvindo fica destacada e a transcrição acompanha. **Buscar na transcrição** (⌘F) encontra palavras.
 - Ao lado de **Transcrição** fica a aba **Resumo**. Sem resumo, contém **Resumir**: escolha um modelo, veja [Resumos](#summaries). Cada resumo tem sua própria aba; **Outro resumo** cria outro.
 - Ainda sem transcrição (uma gravação do iPhone, por exemplo)? Clique em **Transcrever**.
-- **Compartilhar**: **Áudio…**, **Transcrição (.md)…**, **Transcrição em PDF…** ou **Página web com áudio…**: um arquivo com o player, a transcrição, os resumos e o áudio, que funciona em qualquer navegador, também offline. **Página web com áudio, compacta (para e-mail)…** reduz o áudio. A página tem um link para band.je e mais nada.
-- No papel: **Imprimir…** (⌘P, ou em **Compartilhar**) imprime a transcrição, igual ao PDF.
+- **Compartilhar**: **Áudio…** e **Página de áudio…** compartilham a gravação. **Compartilhar como…**, **Copiar como…** e **Salvar como…** perguntam primeiro **PDF**, **Texto** ou **Markdown** e são um só documento: primeiro os resumos, depois a transcrição. Com resumos, você também marca o que entra (tudo vem marcado). **Salvar como…** salva onde você quiser, **Copiar como…** coloca na área de transferência. **Página de áudio…** é um arquivo com o player, a transcrição, os resumos e o áudio, que funciona em qualquer navegador, também offline. **Página de áudio, compacta (para e-mail)…** reduz o áudio. A página tem um link para band.je e mais nada.
+- No papel: **Imprimir…** (⌘P, ou em **Compartilhar**) imprime o mesmo documento que o PDF.
+- Copiar: **Copiar** ao lado de um resumo coloca o texto dele na área de transferência. Você também pode selecionar texto e pressionar ⌘C.
 - **Mais**: **Nome e cor…** (ou clique no título na fita): o nome e a cor da fita, **Nomear falantes…**, **Mostrar no Finder**, **Apagar…** (vai para o Lixo).
 - Você também pode apagar uma gravação pela lista: clique nela com o botão direito e escolha **Apagar…**, ou selecione-a e pressione ⌫. O Band·je pergunta antes.
 
 ## Ditado {#dictation}
-Pressione ⌃⌥⌘D, fale, e o texto aparece onde está o cursor: num chat, num e-mail, num editor ou no Terminal.
+Pressione ⌃⌥⌘D, fale, e seu texto fica na área de transferência. Cole-o com ⌘V onde está o cursor: num chat, num e-mail, num editor ou no Terminal.
 
 Há duas formas de usar o atalho:
 
 - **Toque** em ⌃⌥⌘D: o Band·je ouve até você pressionar Return, ou ⌃⌥⌘D de novo. O próprio Return não é enviado ao app.
-- **Mantenha** ⌃⌥⌘D pressionado: o Band·je ouve enquanto você segura as teclas e cola quando você as solta.
+- **Mantenha** ⌃⌥⌘D pressionado: o Band·je ouve enquanto você segura as teclas e coloca o texto na área de transferência quando você as solta.
 
 Pressione Esc para cancelar. O ícone na barra de menus fica laranja enquanto o Band·je ouve, com o tempo ao lado. Um ditado pode durar até cinco minutos; nos últimos 30 segundos, o tempo pisca.
 
 ### Colar
-O texto sempre fica na área de transferência. Para colar por você, o Band·je precisa de permissão para enviar um pressionamento de tecla (⌘V): escolha **Ativar colagem automática…** no menu, ou vá em Ajustes do Sistema > Privacidade e Segurança > Acessibilidade e ative o Band·je. Sem isso, você mesmo cola com ⌘V.
-
-O macOS só informa essa permissão ao Band·je depois que ele reinicia. Acabou de ativar? Escolha **Reiniciar o Band·je para a colagem automática** no menu, ou **Reiniciar o Band·je** em [Ajustes](#settings).
-
-Se você ouvir um som curto em vez da colagem, um campo de senha ou outro app ativou a entrada segura (a Entrada Segura de Teclado do Terminal, um gerenciador de senhas). O macOS então bloqueia a colagem; o texto está na área de transferência, então pressione ⌘V você mesmo.
+Depois de ditar, o texto fica na área de transferência e ⌘V aparece por um instante ao lado da fita cassete. Pressione ⌘V para colá-lo onde está o cursor. O texto fica na área de transferência até você copiar outra coisa, então você também pode colá-lo mais tarde ou em mais lugares.
 
 Nada do que você dita é salvo.
 
@@ -170,7 +167,25 @@ Clique em **Alterar…** e escolha uma pasta, em qualquer lugar do Mac ou num di
 Se a pasta estiver no iCloud Drive, no Dropbox ou em outro serviço de nuvem (também Mesa e Documentos quando estão no iCloud), o Band·je avisa: suas gravações então saem do Mac por esse serviço.
 
 ### Acesso
-Se o Band·je pode usar o microfone, colar para você e gravar o som do seu Mac, cada um com seu botão (**Permitir…** ou **Abrir ajustes…**). Uma marca verde significa permitido; o estado se atualiza sozinho quando você volta dos Ajustes do Sistema. Veja [Solução de problemas](#troubleshooting).
+Se o Band·je pode usar o microfone e gravar o som do seu Mac, cada um com seu botão (**Permitir…** ou **Abrir ajustes…**). Uma marca verde significa permitido; o estado se atualiza sozinho quando você volta dos Ajustes do Sistema. Veja [Solução de problemas](#troubleshooting).
+
+## Band·je Ilimitado {#purchases}
+O que é grátis, o que as duas compras desbloqueiam e como restaurá-las (Band·je da App Store).
+
+O Band·je é grátis. Gravar é sempre grátis e nunca tem limite.
+
+- **Transcrever** é grátis para as suas 5 primeiras gravações. Uma gravação conta uma vez, quando a primeira transcrição termina; transcrevê-la de novo é grátis.
+- **Ditar** é grátis por 15 minutos de áudio ditado no total. Um ditado em andamento quando os minutos acabam termina normalmente. Depois de 10 minutos, o Band·je avisa uma vez quantos minutos grátis restam; o menu na barra de menus também mostra.
+- O que você já tem continua sendo seu: transcrições, resumos, compartilhamento e exportação nunca são bloqueados. Resumos são grátis em qualquer transcrição.
+
+Duas compras, cada uma paga uma só vez, sem assinatura:
+
+- **Band·je Ilimitado**: transcrição e ditado sem limite.
+- **Band·je Ditado**: ditado sem limite.
+
+Compre em **Ajustes… › Compras**, ou escolha **Comprar Band·je Ilimitado…** no menu Band·je enquanto a janela está aberta. Depois das transcrições grátis, **Transcrever** mostra primeiro o Band·je Ilimitado; uma transcrição automática não começa, e a gravação avisa.
+
+Se você comprou o Band·je antes de ele ser grátis, tudo está desbloqueado sem fazer nada. Uma compra vale em qualquer Mac, iPhone e iPad com a mesma Conta Apple, e com o Compartilhamento Familiar. Em outro Mac, escolha **Restaurar compras**. A parte grátis conta por dispositivo. A janela de boas-vindas diz o que é grátis, com **Já comprou? Restaurar compras**.
 
 ## Privacidade e rede {#privacy}
 Seu áudio, suas transcrições e seus resumos nunca saem do seu Mac.
@@ -199,15 +214,14 @@ Soluções para o que pode dar errado.
 Muitos problemas vêm de uma permissão que falta. Escolha **Ajustes…** e veja em **Acesso**:
 
 - **Microfone**: necessário para gravar sua voz e para ditar.
-- **Som do Mac**: necessário para gravar o outro lado. O macOS não deixa os apps lerem essa permissão, então o Band·je mostra o que aconteceu na última gravação: chegou som, ou ficou em silêncio. Silêncio é normal se nada estava tocando.
-- **Colagem automática**: necessária para colar o texto ditado por você.
+- **Som do Mac**: necessário para gravar o outro lado. O macOS não deixa os apps lerem essa permissão, então o Band·je verifica por conta própria: toca por meio segundo um sinal inaudível que nunca chega aos seus alto-falantes ou AirPods, e vê se ele chega. **Permitir…** faz o macOS perguntar; depois de **Abrir ajustes…**, a marca aparece assim que você ativar o Band·je.
 
 Uma marca verde significa permitido. Senão, clique em **Abrir ajustes…**, ative o Band·je e volte; o Band·je percebe sozinho.
 
-Sempre que abre, o Band·je verifica o microfone e a colagem automática, e avisa se faltar algum. Não precisa da colagem automática? Marque **Não mostrar esta mensagem novamente**, ou desative **Avisar ao iniciar se faltar algo** em Acesso.
+Sempre que abre, o Band·je verifica o microfone, e o som do Mac se estava desativado, e avisa se faltar algum. Não quer o aviso? Marque **Não mostrar esta mensagem novamente**, ou desative **Avisar ao iniciar se faltar algo** em Acesso.
 
 ### O outro lado não aparece na gravação
-O macOS não permitiu que o Band·je gravasse o áudio do Mac. Vá em Ajustes do Sistema > Privacidade e Segurança > Gravação do Áudio do Sistema e da Tela e ative o Band·je em Apenas Gravação do Áudio do Sistema.
+O macOS não permitiu que o Band·je gravasse o áudio do Mac. O Band·je avisa sobre isso no início de uma gravação. Vá em Ajustes do Sistema > Privacidade e Segurança > Gravação do Áudio do Sistema e da Tela e ative o Band·je em Apenas Gravação do Áudio do Sistema. Ainda não funciona logo depois? Reinicie o Band·je.
 
 ### Minha própria voz não aparece
 Verifique o menu **Microfone**. Com a tampa fechada, o microfone interno fica desligado: escolha outro. Se o Band·je não tiver permissão para usar o microfone, ative-a em Ajustes do Sistema > Privacidade e Segurança > Microfone.

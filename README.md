@@ -4,14 +4,14 @@
   <img src=".github/readme/logo.png" width="128" height="128" alt="Bandje">
 </p>
 
-<h3 align="center">Bandje records your conversations and turns them into text.<br>On your Mac, iPhone and iPad. All on device.</h3>
+<h3 align="center">Bandje records your conversations and turns them into text.<br>On your Mac, iPhone, iPad and Apple Watch. All on device.</h3>
 
 <p align="center">
   <a href="https://apps.apple.com/app/id6831353548"><img src="https://img.shields.io/badge/Download_on_the-App_Store-0D96F6?style=for-the-badge&logo=apple&logoColor=white" alt="Download Bandje on the App Store"></a>
 </p>
 
 <p align="center">
-  <b>One purchase for Mac, iPhone and iPad.</b> No subscription. No tokens. No account.<br>
+  <b>Free to try. Pay once for Mac, iPhone and iPad.</b> No subscription. No tokens. No account.<br>
   <a href="https://band.je">band.je</a>
 </p>
 
@@ -24,13 +24,15 @@
 
 ## What Bandje does
 
-**⚡ Hyperfast prompt dictation on your Mac.** Press ⌃⌥⌘D, speak, and the text appears where your cursor is: in your editor, your mail, your AI prompt. Tap to start and stop, or hold to talk.
+**⚡ Hyperfast prompt dictation on your Mac.** Press ⌃⌥⌘D, speak, and paste the text with ⌘V: in your editor, your mail, your AI prompt. Tap to start and stop, or hold to talk. Built from this source, or downloaded from [band.je](https://band.je/mac/), Bandje pastes it for you (see [Build it yourself](#build-it-yourself)).
 
 **🎙️ Record and transcribe.** Calls in any app (FaceTime, Zoom, Teams, Meet, phone calls through your Mac), meetings, lectures and memos. Bandje records both sides of a call, and no bot joins your meeting. Already have recordings? Import your voice memos, earlier calls and other audio files and transcribe those too.
 
 **🗣️ Who said what.** Speaker diarization labels every voice. Listen to a short clip of each speaker and give them a name.
 
 **📝 Summaries in your own templates.** Write a template as a plain text file (meeting notes, action items, a sales call, a lecture) and Bandje fills it in with Apple Intelligence, on your device.
+
+**⌚ Apple Watch.** Start a recording on your wrist, mark a moment, and pick it up on your iPhone.
 
 **☁️ iCloud, if you want it.** Record on your iPhone, read on your Mac. Recordings, transcripts and summaries sync through your own iCloud Drive, not through us. Off by default.
 
@@ -57,11 +59,11 @@
 
 ## All on device
 
-Speech recognition, speaker labels and summaries run on your own Mac, iPhone or iPad. Your audio, transcripts and summaries never go to a server: there is no Bandje server. No account, no analytics, no tracking.
+Speech recognition, speaker labels and summaries run on your own Mac, iPhone or iPad. Your audio, transcripts and summaries stay on your devices (and in your own iCloud Drive, if you turn sync on). No account, no analytics, no tracking.
 
-Don't take our word for it. That's what this repository is for: every line of Bandje's own code is here, and [`check-no-network.sh`](macos/scripts/check-no-network.sh) checks that it contains no networking code, on every push.
+Don't take our word for it. That's what this repository is for: the code of the App Store apps is here, and [`check-no-network.sh`](macos/scripts/check-no-network.sh) checks that it contains no networking code, on every push.
 
-One honest footnote: the speech engine by [Desert Ant Labs](https://desertant.com) checks its license at most once a month per speech model. It sends a random install ID and version numbers, not tied to you. Never audio, never text. See the [privacy page](https://band.je/privacy/).
+Two honest footnotes. The speech engine by [Desert Ant Labs](https://desertant.com) checks its license at most once a month per speech model. It sends a random install ID and version numbers, not tied to you. Never audio, never text. And the Mac download from [band.je](https://band.je/mac/) adds a small private layer that is not in this repository: a license check with Polar, update checks, and a one-time download of the speech models. See the [privacy page](https://band.je/privacy/).
 
 <p align="center">
   <picture>
@@ -79,17 +81,19 @@ One honest footnote: the speech engine by [Desert Ant Labs](https://desertant.co
 | **Mac** | macOS 15 or later, Apple silicon. Summaries need macOS 26 with Apple Intelligence. |
 | **iPhone** | iOS 26 or later |
 | **iPad** | iPadOS 26 or later |
+| **Apple Watch** | watchOS 26 or later, with the iPhone app |
 
 ---
 
 ## Build it yourself
 
-Bandje is free software under the GPL. Buying it on the App Store is the easy way, and it keeps this project going. If you'd rather build it yourself, here's how.
+Bandje is free software under the GPL. Buying it on the App Store (or on [band.je](https://band.je/mac/)) is the easy way, and it keeps this project going. If you'd rather build it yourself, here's how.
 
 | Folder | What | Build instructions |
 |---|---|---|
 | [`macos/`](macos) | The Mac app: menu bar, window, call recording, dictation (Swift Package, `make`) | [macos/README.md](macos/README.md) |
-| [`ios/`](ios) | The iPhone and iPad app (XcodeGen, Xcode 27) | [ios/README.md](ios/README.md) |
+| [`ios/`](ios) | The iPhone, iPad and Apple Watch app (XcodeGen, Xcode 27) | [ios/README.md](ios/README.md) |
+| [`bandje-core/`](bandje-core) | BandjeKit, the code both apps share: player, markers, purchases (Swift Package). The apps find it next to them as `../bandje-core`. | [bandje-core/README.md](bandje-core/README.md) |
 
 In short, on an Apple silicon Mac with Xcode 27:
 
@@ -102,6 +106,8 @@ make test
 cd ../ios
 make build                  # needs xcodegen; uses the same models
 ```
+
+**The `APPSTORE` flag.** The Mac App Store build is compiled with `APPSTORE` (set in [`macos/mas/project.yml`](macos/mas/project.yml)). That build has the in-app purchases and, because of App Review guideline 2.4.5, no automatic pasting: dictated text goes to the clipboard. `make app` builds without the flag: everything is unlocked, there is no store, and dictation pastes for you after you allow Bandje under Privacy & Security › Accessibility. The iOS app has no such flag; it uses StoreKit, and [`ios/StoreKit/Bandje.storekit`](ios/StoreKit/Bandje.storekit) lets you test the purchases locally in Xcode.
 
 Speech recognition (Voz) and speaker recognition (Who) by [Desert Ant Labs](https://desertant.com), under the Desert Ant Labs Source-Available License 1.0. They are fetched separately and are not covered by the GPL.
 

@@ -1,0 +1,70 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "B4C1E0F2-6E7A-4E58-9B7B-2D2B8C1A0F11",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : true,
+      "internalID" : "6755100001",
+      "localizations" : [
+        {
+          "description" : "Transcribe as many recordings as you want, and dictate on the Mac.",
+          "displayName" : "Band·je Unlimited",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Transcribeer zoveel opnames als je wilt, en dicteer op de Mac.",
+          "displayName" : "Band·je Onbeperkt",
+          "locale" : "nl"
+        }
+      ],
+      "productID" : "com.neurendal.bandje.unlimited",
+      "referenceName" : "Band·je Onbeperkt",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : true,
+      "internalID" : "6755100002",
+      "localizations" : [
+        {
+          "description" : "Dictate on the Mac as much as you want.",
+          "displayName" : "Band·je Dictation",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Dicteer op de Mac zoveel als je wilt.",
+          "displayName" : "Band·je Dicteren",
+          "locale" : "nl"
+        }
+      ],
+      "productID" : "com.neurendal.bandje.dictation",
+      "referenceName" : "Band·je Dicteren",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_developerTeamID" : "KKWHW59YC3",
+    "_locale" : "nl",
+    "_storefront" : "NLD"
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

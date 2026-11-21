@@ -11,6 +11,8 @@ struct Shortcut: Equatable {
 
     static let defaultRecord = Shortcut(keyCode: kVK_ANSI_R, modifiers: Hotkey.controlOptionCommand)
     static let defaultDictate = Shortcut(keyCode: kVK_ANSI_D, modifiers: Hotkey.controlOptionCommand)
+    /// Markeer dit moment while recording (specs/markers.md 8).
+    static let defaultMark = Shortcut(keyCode: kVK_ANSI_M, modifiers: Hotkey.controlOptionCommand)
 
     static var record: Shortcut {
         get { load("shortcut.record") ?? defaultRecord }
@@ -19,6 +21,10 @@ struct Shortcut: Equatable {
     static var dictate: Shortcut {
         get { load("shortcut.dictate") ?? defaultDictate }
         set { save(newValue, "shortcut.dictate") }
+    }
+    static var mark: Shortcut {
+        get { load("shortcut.mark") ?? defaultMark }
+        set { save(newValue, "shortcut.mark") }
     }
 
     private static func load(_ key: String) -> Shortcut? {
@@ -142,16 +148,20 @@ enum LoginItem {
 }
 
 /// Window "Instellingen…": tabs as in macOS Settings, each one short: Algemeen (starting,
-/// language), Sneltoetsen, Transcriptie, Opslag (iCloud, folder) and Toegang (permissions). Rows
-/// have the label left and the control right, in a card per section.
+/// language), Sneltoetsen, Geluid (microphone, output), Transcriptie, Opslag (iCloud, folder),
+/// Toegang (permissions) and, with a store, Aankopen. Rows have the label left and the control
+/// right, in a card per section.
 @MainActor
-final class SettingsWindow {
+enum SettingsWindow {
     private static var window: NSWindow?
 
+    /// The Aankopen tab (last; only when `Store.isActive`).
+    static let purchasesTab = 6
+
     /// `apply` registers the shortcuts and returns an error text when that fails (taken by another
-    /// app); `chooseFolder(reset)` returns true when the folder changed; `restart` relaunches Bandje.
-    /// `tab`: the tab to show (0…4; the selftest's screenshots).
-    static func show(apply: @escaping (_ record: Shortcut, _ dictate: Shortcut) -> String?,
+    /// app; Markeren is only tried, it is registered while recording); `chooseFolder(reset)` returns true when the folder changed; `restart` relaunches Bandje.
+    /// `tab`: the tab to show (0…6, in the order above; the selftest's screenshots).
+    static func show(apply: @escaping (_ record: Shortcut, _ dictate: Shortcut, _ mark: Shortcut) -> String?,
                      chooseFolder: @escaping (_ reset: Bool) -> Bool,
                      restart: @escaping () -> Void,
                      setSync: @escaping (Bool) -> Bool = { _ in false },
@@ -159,7 +169,9 @@ final class SettingsWindow {
                      chooseOutput: @escaping (String) -> String? = { _ in nil },
                      tab: Int? = nil) {
         if let window {
-            if let tab, let tabs = window.contentViewController as? NSTabViewController { tabs.selectedTabViewItemIndex = tab }
+            if let tab, let tabs = window.contentViewController as? NSTabViewController, tab < tabs.tabViewItems.count {
+                tabs.selectedTabViewItemIndex = tab
+            }
             window.makeKeyAndOrderFront(nil); NSApp.activate(); return
         }
         let tabs = NSTabViewController()
@@ -167,7 +179,8 @@ final class SettingsWindow {
         func add(_ title: String, _ symbol: String, _ view: some View) {
             // The selected tab, buttons and links take the app's accent (Band·je red, readable in
             // dark mode too); only the switches are band.je navy (RowToggle).
-            let host = NSHostingController(rootView: view.frame(width: 460).padding(20))
+            // Wider with the seventh tab (Aankopen), so every tab fits in the toolbar in every language.
+            let host = NSHostingController(rootView: view.frame(width: Store.isActive ? 580 : 460).padding(20))
             host.sizingOptions = .preferredContentSize
             host.title = title  // the window's title follows the tab (was "Untitled")
             let item = NSTabViewItem(viewController: host)
@@ -181,25 +194,39 @@ final class SettingsWindow {
         add(tr("settings.tab.transcription", "Transcriptie"), "text.quote", TranscriptionSettings())
         add(tr("settings.tab.storage", "Opslag"), "externaldrive", StorageSettings(chooseFolder: chooseFolder, setSync: setSync))
         add(tr("welcome.access", "Toegang"), "hand.raised", AccessSettings(restart: restart))
-        if let tab { tabs.selectedTabViewItemIndex = tab }
+        // Freemium: only the App Store build (and a DEBUG build with -purchaseState) has a store.
+        if Store.isActive { add(tr("settings.tab.purchases", "Aankopen"), "bag", PurchasesSettings()) }
+        if let tab, tab < tabs.tabViewItems.count { tabs.selectedTabViewItemIndex = tab }
         let w = NSWindow(contentViewController: tabs)
         w.title = tabs.tabViewItems[tabs.selectedTabViewItemIndex].label  // as after a tab switch
         w.styleMask = [.titled, .closable]
         w.isReleasedWhenClosed = false
         w.center()
         window = w
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
-            MainActor.assumeIsolated { window = nil }
-        }
+        w.onClose { window = nil }
         NSApp.activate()
         w.makeKeyAndOrderFront(nil)
+    }
+}
+
+extension NSWindow {
+    /// Runs `body` once, when the window is about to close. The observer is removed then: kept, it
+    /// would hold everything its block captures (often the window itself) for the rest of the run.
+    func onClose(_ body: @escaping @MainActor () -> Void) {
+        final class Token: @unchecked Sendable { var observer: NSObjectProtocol? }
+        let token = Token()
+        token.observer = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: self, queue: .main) { _ in
+            if let observer = token.observer { NotificationCenter.default.removeObserver(observer) }
+            token.observer = nil
+            MainActor.assumeIsolated { body() }
+        }
     }
 }
 
 // MARK: Parts
 
 /// A section: a small grey heading, a card with rows, a short grey note under it.
-private struct SettingsCard<Content: View>: View {
+struct SettingsCard<Content: View>: View {
     var title: String?
     var footer: String?
     var red = false
@@ -220,7 +247,7 @@ private struct SettingsCard<Content: View>: View {
 }
 
 /// One row: the label (and an optional note under it) left, the control right.
-private struct SettingsRow<Control: View>: View {
+struct SettingsRow<Control: View>: View {
     let label: String
     var note: String?
     @ViewBuilder var control: Control
@@ -322,14 +349,15 @@ private struct GeneralSettings: View {
 // MARK: Sneltoetsen
 
 private struct ShortcutSettings: View {
-    let apply: (Shortcut, Shortcut) -> String?
+    let apply: (Shortcut, Shortcut, Shortcut) -> String?
     @State private var record = Shortcut.record
     @State private var dictate = Shortcut.dictate
+    @State private var mark = Shortcut.mark
     @State private var editing: Field?
     @State private var error: String?
     @State private var monitor: Any?
 
-    enum Field { case record, dictate }
+    enum Field { case record, dictate, mark }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -338,10 +366,13 @@ private struct ShortcutSettings: View {
                 SettingsRow(label: tr("shortcuts.record", "Opnemen")) { recorder(.record, record) }
                 Divider()
                 SettingsRow(label: tr("shortcuts.dictate", "Dicteren")) { recorder(.dictate, dictate) }
+                Divider()
+                SettingsRow(label: tr("shortcuts.mark", "Markeer dit moment"),
+                            note: tr("shortcuts.mark.note2", "Werkt tijdens een opname, en in het venster bij het luisteren.")) { recorder(.mark, mark) }
             }
             Button(tr("shortcuts.reset", "Herstel standaard")) {
                 stopEditing()
-                commit(.defaultRecord, .defaultDictate)
+                commit(.defaultRecord, .defaultDictate, .defaultMark)
             }
         }
         .onDisappear { stopEditing() }
@@ -366,6 +397,7 @@ private struct ShortcutSettings: View {
         // The global hotkeys would swallow the current combination; off while recording a new one.
         Hotkey.unregister(.record)
         Hotkey.unregister(.dictate)
+        Hotkey.unregister(.mark)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == UInt16(kVK_Escape) && event.modifierFlags.intersection([.command, .option, .control]).isEmpty {
                 stopEditing()
@@ -375,14 +407,18 @@ private struct ShortcutSettings: View {
                 error = tr("shortcuts.needModifier", "Gebruik ⌘, ⌃ of ⌥ in de combinatie.")
                 return nil
             }
-            let other = field == .record ? dictate : record
-            if shortcut == other {
-                error = tr("shortcuts.duplicate", "Deze combinatie is al in gebruik voor de andere sneltoets.")
+            let others: [Shortcut] = switch field {
+            case .record: [dictate, mark]
+            case .dictate: [record, mark]
+            case .mark: [record, dictate]
+            }
+            if others.contains(shortcut) {
+                error = tr("shortcuts.duplicate", "Deze combinatie is al in gebruik voor een andere sneltoets.")
                 return nil
             }
             editing = nil
             removeMonitor()
-            commit(field == .record ? shortcut : record, field == .dictate ? shortcut : dictate)
+            commit(field == .record ? shortcut : record, field == .dictate ? shortcut : dictate, field == .mark ? shortcut : mark)
             return nil
         }
     }
@@ -390,7 +426,7 @@ private struct ShortcutSettings: View {
     private func stopEditing() {
         editing = nil
         removeMonitor()
-        _ = apply(record, dictate) // re-register the unchanged shortcuts
+        _ = apply(record, dictate, mark) // re-register the unchanged shortcuts
     }
 
     private func removeMonitor() {
@@ -398,14 +434,15 @@ private struct ShortcutSettings: View {
         monitor = nil
     }
 
-    private func commit(_ newRecord: Shortcut, _ newDictate: Shortcut) {
-        if let problem = apply(newRecord, newDictate) {
+    private func commit(_ newRecord: Shortcut, _ newDictate: Shortcut, _ newMark: Shortcut) {
+        if let problem = apply(newRecord, newDictate, newMark) {
             error = problem
-            _ = apply(record, dictate)
+            _ = apply(record, dictate, mark)
             return
         }
         record = newRecord
         dictate = newDictate
+        mark = newMark
         error = nil
     }
 }
@@ -565,19 +602,20 @@ private struct StorageSettings: View {
 
 // MARK: Toegang
 
-/// The permissions with the welcome's words; the state refreshes by itself when Band·je becomes
-/// active again (back from System Settings).
+/// The permissions with the welcome's words; the state refreshes by itself every second, as in
+/// the welcome (a grant at a recording's prompt or in System Settings shows without reopening).
 private struct AccessSettings: View {
     let restart: () -> Void
     @State private var mic = Permissions.microphone
     @State private var system = Permissions.systemAudio
     @State private var paste = Permissions.paste
-    @State private var pasteAsked = Paste.askedThisLaunch
+    @State private var pasteAsked = false
     @State private var checkAtLaunch = Permissions.checkAtLaunch
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            SettingsCard(footer: system == .unknown ? tr("settings.permissions.silent.hint", "Bij de laatste opname kwam er geen geluid van je Mac binnen. Speelde er niets af, dan is dat normaal. Anders: klik bij Geluid van je Mac op Open instellingen… en zet Band·je aan.") : nil) {
+            SettingsCard(footer: system == .denied ? tr("settings.permissions.system.denied", "Band·je mag het geluid van je Mac niet opnemen: de andere kant van een gesprek ontbreekt dan in je opnames. Klik bij Geluid van je Mac op Open instellingen… en zet Band·je aan bij Scherm- en systeemaudio-opname.")
+                                 : system == .unknown ? tr("settings.permissions.silent.hint", "Bij de laatste opname kwam er geen geluid van je Mac binnen. Speelde er niets af, dan is dat normaal. Anders: klik bij Geluid van je Mac op Open instellingen… en zet Band·je aan.") : nil) {
                 SettingsRow(label: tr("settings.permissions.mic", "Microfoon"), note: tr("welcome.mic", "Om jou te horen bij opnemen en dicteren.")) {
                     switch mic {
                     case .allowed: allowed
@@ -586,6 +624,15 @@ private struct AccessSettings: View {
                     }
                 }
                 Divider()
+                SettingsRow(label: tr("settings.permissions.system", "Geluid van je Mac"), note: tr("welcome.system", "Om het geluid van je Mac op te nemen: de andere kant van een gesprek.")) {
+                    SystemAudioPermissionControl(restart: restart)
+                }
+            }
+            // Optional, apart from what recording needs (App Review 2.4.5, 2026-11-17).
+            // Automatic pasting only in a build from source (App Review 2.4.5, see `Paste`).
+            SettingsCard(title: Paste.available ? tr("welcome.optional", "Optioneel") : nil,
+                         footer: Paste.available ? tr("welcome.optional.footer", "Band·je werkt volledig zonder. Zonder automatisch plakken staat gedicteerde tekst op het klembord en plak je zelf met ⌘V.") : nil) {
+                #if !APPSTORE
                 SettingsRow(label: tr("settings.permissions.paste", "Automatisch plakken"),
                             note: paste != .allowed && pasteAsked ? tr("settings.permissions.paste.restart", "Net aangezet? macOS laat het Band·je pas zien na een herstart.")
                                                                   : tr("welcome.paste", "Om gedicteerde tekst voor je te plakken (⌘V). Zonder staat de tekst op het klembord.")) {
@@ -594,27 +641,26 @@ private struct AccessSettings: View {
                     } else if pasteAsked {
                         Button(tr("settings.language.restartNow", "Herstart Band·je")) { restart() }
                     } else {
-                        Button(tr("welcome.allow", "Sta toe…")) { Paste.requestPermission(); refresh() }
+                        Button(tr("welcome.paste.on", "Zet aan…")) { Paste.requestPermission(); refresh() }
                     }
                 }
                 Divider()
-                SettingsRow(label: tr("settings.permissions.system", "Geluid van je Mac"), note: tr("welcome.system", "Om het geluid van je Mac op te nemen: de andere kant van een gesprek.")) {
-                    switch system {
-                    case .allowed: allowed
-                    case .notAsked: Text(tr("welcome.system.later", "Bij eerste opname")).foregroundStyle(.secondary)
-                    default: Button(tr("settings.permissions.open", "Open instellingen…")) { Permissions.openSettings("Privacy_ScreenCapture") }
-                    }
-                }
-            }
-            SettingsCard {
+                #endif
+                // On by default; it only covers the microphone and the sound of the Mac (owner, 2026-11-17).
                 SettingsRow(label: tr("settings.permissions.atLaunch", "Waarschuw bij het starten als er iets ontbreekt")) {
                     RowToggle(isOn: $checkAtLaunch)
                 }
             }
         }
         .onChange(of: checkAtLaunch) { Permissions.checkAtLaunch = checkAtLaunch }
-        // Back from System Settings: show the new state.
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
+        // macOS doesn't tell when a permission changes (its prompt at a recording, System Settings):
+        // look again every second while this pane is open.
+        .task {
+            while !Task.isCancelled {
+                refresh()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     private var allowed: some View {
@@ -628,6 +674,8 @@ private struct AccessSettings: View {
         mic = Permissions.microphone
         system = Permissions.systemAudio
         paste = Permissions.paste
+        #if !APPSTORE
         pasteAsked = Paste.askedThisLaunch
+        #endif
     }
 }

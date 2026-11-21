@@ -143,6 +143,12 @@ struct TranscriptTests {
         #expect(TranscriptWriter.isRecordingName("2026-11-04_14-30_2"))
         #expect(!TranscriptWriter.isRecordingName("Nieuwe opname 3"))
         #expect(!TranscriptWriter.isRecordingName("memo_2026"))
+        // A real date and time only (was: any 10 and 5 characters with a dash).
+        #expect(!TranscriptWriter.isRecordingName("abcdefghij_ab-cd"))
+        #expect(!TranscriptWriter.isRecordingName("2026-13-04_14-30"))
+        #expect(!TranscriptWriter.isRecordingName("2026-11-04_25-30"))
+        #expect(!TranscriptWriter.isRecordingName("2026-11-04_14-30_x"))
+        #expect(!TranscriptWriter.isRecordingName("2026-11-04_14-30_"))
         #expect(Transcriber.downmix([[1, 0.5, 0], [0, 0.5, 1]]) == [0.5, 0.5, 0.5])
         #expect(Transcriber.downmix([[0.25, 0.5]]) == [0.25, 0.5])
     }
@@ -206,7 +212,7 @@ struct TranscriptTests {
         #expect(TranscriptWriter.markdown(named, locale: Locale(identifier: "nl_NL")).contains("**0:06 · Jan**  \nJa hallo."))
         #expect(TranscriptWriter.title(forBaseName: "2026-11-04_14-30_2") == "2026-11-04 14:30")
         #expect(TranscriptWriter.title(forBaseName: "Memo 12") == "Memo 12")
-        #expect(TranscriptWriter.timestamp(3725.9) == "01:02:05")
+        #expect(TranscriptWriter.clock(3725.9, long: true) == "1:02:05")
         let json = try #require(try JSONSerialization.jsonObject(with: TranscriptWriter.json(t)) as? [String: Any])
         let channels = (json["segments"] as? [[String: Any]])?.compactMap { $0["channel"] as? String }
         #expect(channels == ["L", "R"])

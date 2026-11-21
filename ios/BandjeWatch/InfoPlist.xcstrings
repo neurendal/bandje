@@ -1,0 +1,75 @@
+{
+  "sourceLanguage" : "en",
+  "version" : "1.0",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "shouldTranslate" : false
+    },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Privacy - Microphone Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je records with the microphone. Recordings move to Band·je on your iPhone."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je neemt op met de microfoon. Opnames gaan naar Band·je op je iPhone."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je nimmt mit dem Mikrofon auf. Aufnahmen gehen an Band·je auf deinem iPhone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je graba con el micrófono. Las grabaciones pasan a Band·je en tu iPhone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je enregistre avec le micro. Les enregistrements passent dans Band·je sur votre iPhone."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je registra con il microfono. Le registrazioni passano a Band·je sul tuo iPhone."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je nagrywa za pomocą mikrofonu. Nagrania trafiają do Band·je na Twoim iPhonie."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Band·je grava com o microfone. As gravações vão para o Band·je no seu iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je записывает с помощью микрофона. Записи переходят в Band·je на вашем iPhone."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band·je записує через мікрофон. Записи переходять у Band·je на вашому iPhone."
+          }
+        }
+      }
+    }
+  }
+}

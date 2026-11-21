@@ -6,6 +6,8 @@ let package = Package(
     platforms: [.macOS(.v15)],
     dependencies: [
         .package(url: "https://github.com/Desert-Ant-Labs/desert-ant-core.git", exact: "4.2.3"),
+        // Shared with the iOS app (BandjeKit), next to this repo: ../bandje-core.
+        .package(path: "../bandje-core"),
     ],
     targets: [
         .executableTarget(
@@ -13,13 +15,14 @@ let package = Package(
             dependencies: [
                 .product(name: "Voz", package: "desert-ant-core"),
                 .product(name: "Who", package: "desert-ant-core"),
+                .product(name: "BandjeKit", package: "bandje-core"),
             ],
             path: "Sources/Bandje",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "BandjeTests",
-            dependencies: ["Bandje"],
+            dependencies: ["Bandje", .product(name: "BandjeKit", package: "bandje-core")],
             path: "Tests/BandjeTests",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

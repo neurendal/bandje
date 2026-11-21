@@ -1,4 +1,5 @@
 import AppKit
+import BandjeKit
 import SwiftUI
 
 /// What Bandje is doing, for the window. `BandjeApp` keeps it up to date (in `updateMenu`) and
@@ -11,9 +12,13 @@ final class Activity {
     /// The recording in progress: its name and start (the row at the top of the list).
     var recordingTitle: String?
     var recordingStarted: Date?
+    /// Flags set in the recording in progress (the record screen shows how many).
+    var recordingMarkers = 0
     /// The audio file being transcribed, and the status line ("Transcriberen… 40%").
     var transcribing: URL?
     var transcriptionStatus = ""
+    /// "Only the first time after installing or updating…" while a model loads for the first time.
+    var transcriptionHint: String?
     /// 0…1 once the model is loaded (the progress bars), nil before.
     var transcriptionFraction: Double?
     /// The transcript being summarized, and its status line.
@@ -25,6 +30,8 @@ final class Activity {
     /// The welcome with the permissions fills the window (first launch; after an update when a
     /// permission is missing) until Begin.
     var showsWelcome = false
+    /// The welcome's step: 1 getting to know, 2 access (after an update with a permission missing).
+    var welcomeStep = 1
     /// Audio files being downloaded from iCloud right now (the window says so).
     var downloading: Set<URL> = []
 
@@ -46,6 +53,8 @@ final class Activity {
     }
 
     @ObservationIgnored var toggleRecording: () -> Void = {}
+    /// Markeer dit moment in the recording in progress.
+    @ObservationIgnored var mark: () -> Void = {}
     @ObservationIgnored var transcribe: (URL) -> Void = { _ in }
     @ObservationIgnored var summarize: (URL, String) -> Void = { _, _ in }
     @ObservationIgnored var openTemplates: () -> Void = {}
@@ -83,7 +92,7 @@ enum MainWindow {
         if window == nil {
             let root = MainView(selection: selection)
                 .environment(Library.shared)
-                .environment(AudioPlayer.shared)
+                .environment(Playback.player)
                 .environment(Activity.shared)
             let w = NSWindow(contentViewController: NSHostingController(rootView: root))
             w.title = "Band·je"  // the Window menu and Mission Control; not shown in the window
@@ -95,14 +104,17 @@ enum MainWindow {
             w.setFrameAutosaveName("BandjeMain")
             w.center()
             if Activity.shared.showsWelcome {
-                // The welcome is one column: a window as big as its content.
+                // The welcome is one column in two steps, the same size for both (and with or
+                // without the store): fits a 13-inch MacBook's screen without scrolling.
                 w.contentMinSize = NSSize(width: 520, height: 520)
-                w.setContentSize(NSSize(width: 560, height: 820))
+                let room = (w.screen ?? NSScreen.main).map { $0.visibleFrame.height - (w.frame.height - w.contentLayoutRect.height) } ?? welcomeHeight
+                w.setContentSize(NSSize(width: 560, height: min(welcomeHeight, room)))
                 w.center()
             }
             NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
                 MainActor.assumeIsolated {
-                    AudioPlayer.shared.pause()
+                    // P1: closing the window stops playback; the position is kept (specs/player.md 9).
+                    Playback.left(showing: nil)
                     // After the close, so isOpen is false when the Dock icon is updated.
                     DispatchQueue.main.async {
                         NotificationCenter.default.post(name: .bandjeWindowVisibility, object: nil)
@@ -115,13 +127,31 @@ enum MainWindow {
             // plays and pauses, and the field showed its focus ring before you clicked it.
             DispatchQueue.main.async { w.makeFirstResponder(nil) }
             Library.shared.start()
-            // Space plays and pauses, but never while typing (search fields, renaming).
+            // Space plays and pauses, ⌘← and ⌘→ skip 15 s (specs/player.md 5.1), but never while
+            // typing (search fields, renaming: there ⌘← goes to the start of the line).
             NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                guard event.keyCode == 49, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return event }
+                // The Mark This Moment shortcut (⌃⌥⌘M) in the window: a marker where the player is, as ⌘D.
+                // While recording the global hotkey takes it before it gets here.
+                if let pressed = Shortcut(event: event) {
+                    let number = event.windowNumber
+                    let handled = MainActor.assumeIsolated { () -> Bool in
+                        guard pressed == Shortcut.mark, let window, number == window.windowNumber,
+                              window.attachedSheet == nil else { return false }
+                        NotificationCenter.default.post(name: .bandjeAddMarker, object: nil)
+                        return true
+                    }
+                    if handled { return nil }
+                }
+                guard let key = PlayerKey(keyCode: event.keyCode, modifiers: event.modifierFlags) else { return event }
                 let number = event.windowNumber
                 let handled = MainActor.assumeIsolated { () -> Bool in
-                    guard let window, number == window.windowNumber, !(window.firstResponder is NSText) else { return false }
-                    NotificationCenter.default.post(name: .bandjeTogglePlay, object: nil)
+                    guard let window, number == window.windowNumber, !(window.firstResponder is NSText),
+                          window.attachedSheet == nil else { return false }
+                    switch key {
+                    case .playPause: NotificationCenter.default.post(name: .bandjeTogglePlay, object: nil)
+                    case .back: Playback.player.skip(by: -PlayerModel.skipInterval)
+                    case .forward: Playback.player.skip(by: PlayerModel.skipInterval)
+                    }
                     return true
                 }
                 return handled ? nil : event
@@ -166,6 +196,9 @@ enum MainWindow {
         if response == .alertSecondButtonReturn { NSApp.terminate(nil) }
     }
 
+    /// The welcome's height below the title bar.
+    static let welcomeHeight: CGFloat = 600
+
     /// Begin on the welcome: the library, in a window of the usual size.
     static func endWelcome() {
         Activity.shared.showsWelcome = false
@@ -175,10 +208,14 @@ enum MainWindow {
         window.center()
     }
 
-    /// After a recording stops or a summary is done: show that recording, but only in a window that
-    /// is already open (`file` is in its folder). A closed window stays closed.
-    static func reveal(_ file: URL) {
-        guard isOpen else { return }
+    /// Show the recording `file` is in. `opening`: also when the window is closed (a recording just
+    /// stopped, Transcribe or Summarize chosen in the menu; owner, 2026-11-08). Without it (a job
+    /// that finished, the menu's choice) only a window that is already open follows.
+    static func reveal(_ file: URL, opening: Bool = false) {
+        if !isOpen {
+            guard opening else { return }
+            show()
+        }
         let path = file.deletingLastPathComponent().standardizedFileURL.path
         Task {
             await Library.shared.refresh()
@@ -188,15 +225,42 @@ enum MainWindow {
         }
     }
 
+    /// A recording moved by Band·je itself (from the staging folder into iCloud): the window keeps
+    /// showing it, from its new place.
+    static func followMove(from old: URL, to new: URL) {
+        guard selection.folder?.standardizedFileURL == old.standardizedFileURL else { return }
+        selection.folder = new
+    }
+
     /// The window itself (printing; the selftest's snapshot).
     static var nsWindow: NSWindow? { window }
+}
+
+/// The window's player keys (specs/player.md 5.1): space, ⌘←, ⌘→.
+enum PlayerKey: Equatable {
+    case playPause, back, forward
+
+    init?(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        // The arrows carry .numericPad and .function; only the user's modifiers count.
+        let mods = modifiers.intersection([.command, .option, .control, .shift])
+        switch (keyCode, mods) {
+        case (49, []): self = .playPause
+        case (123, .command): self = .back
+        case (124, .command): self = .forward
+        default: return nil
+        }
+    }
 }
 
 extension Notification.Name {
     /// The Bandje window opened or closed (the Dock icon follows).
     static let bandjeWindowVisibility = Notification.Name("bandjeWindowVisibility")
-    /// Space in the window (not in a text field): play or pause the open recording.
+    /// Space in the window (not in a text field): play or pause the open recording, else the player's.
     static let bandjeTogglePlay = Notification.Name("bandjeTogglePlay")
+    /// The Mark This Moment shortcut in the window: a marker in the open recording, as ⌘D.
+    static let bandjeAddMarker = Notification.Name("bandjeAddMarker")
+    /// Wijzig › Zoek… (⌘F): the search bar above the open recording's transcript.
+    static let bandjeFind = Notification.Name("bandjeFind")
     /// Archief › Druk af… (⌘P): print the open recording's transcript.
     static let bandjePrint = Notification.Name("bandjePrint")
     /// The window selected a recording (object: its folder); the menu's current recording follows.
@@ -209,6 +273,7 @@ private struct MainView: View {
     @Bindable var selection: MainWindow.Selection
     @Environment(Library.self) private var library
     @Environment(Activity.self) private var activity
+    @Environment(PlayerModel.self) private var player
     @State private var query = ""
 
     var body: some View {
@@ -216,6 +281,22 @@ private struct MainView: View {
             WelcomeView()
         } else {
             splitView
+                .onReceive(NotificationCenter.default.publisher(for: .bandjeTogglePlay)) { _ in togglePlay() }
+        }
+    }
+
+    /// The recording the detail shows (not the record screen).
+    private var detail: Recording? {
+        guard !(activity.isRecording && selection.showsRecorder), let folder = selection.folder else { return nil }
+        return library.recordings.first { $0.folder == folder }
+    }
+
+    /// Space: the open recording (it starts when it isn't playing yet), else whatever plays.
+    private func togglePlay() {
+        if let detail, detail.audio != nil {
+            Playback.toggle(detail)
+        } else if player.current != nil {
+            player.togglePlayPause()
         }
     }
 
@@ -249,8 +330,9 @@ private struct MainView: View {
         } detail: {
             if activity.isRecording, selection.showsRecorder {
                 RecordScreen()
-            } else if let folder = selection.folder, let recording = library.recordings.first(where: { $0.folder == folder }) {
+            } else if let recording = detail {
                 RecordingView(recording: recording, nameSpeakers: $selection.nameSpeakers, openTab: $selection.tab,
+                              searchQuery: query,
                               onMoved: { selection.folder = $0 }, onDeleted: { selection.folder = nil })
                     .id(recording.folder)
             } else if !library.hasLoaded {
@@ -274,6 +356,9 @@ private struct MainView: View {
         // band.je navy for the selection and selected tab instead of the system accent (owner).
         .tint(Color.navy)
         .onChange(of: selection.folder) { _, folder in
+            // P1: another recording (or none) in the detail stops the one playing. A rename moves
+            // the player first (Playback.moved), so the renamed recording plays on.
+            Playback.left(showing: selection.showsRecorder ? nil : folder)
             if let folder {
                 selection.showsRecorder = false
                 NotificationCenter.default.post(name: .bandjeWindowSelection, object: folder)
@@ -321,6 +406,12 @@ enum LaunchPolicy {
 
     static func showWelcome(firstLaunch: Bool, updated: Bool, permissionMissing: Bool) -> Bool {
         firstLaunch || (updated && permissionMissing)
+    }
+
+    /// The welcome's first step: getting to know the first time; after an update (it only shows
+    /// then when a permission is missing) straight to Access.
+    static func welcomeStep(firstLaunch: Bool) -> Int {
+        firstLaunch ? 1 : 2
     }
 
     /// Another build than last time (not the first launch: then there was no last build).
@@ -398,9 +489,13 @@ private struct RecordMark: View {
     }
 }
 
-/// The first screen of the window: the cassette and a welcome, the two shortcuts, privacy in one
-/// line, the permissions (Toegang) with a button each and a check mark once allowed, opening at
-/// login, Begin, and a word from the makers. Everything left-aligned in one ~500 pt column.
+/// The first screen of the window, in two steps in one window of a fixed size (owner, 2026-11-12).
+/// 1. Getting to know: the cassette and a welcome, the two shortcuts, Free to Start (App Store build)
+///    and a word from the makers; Next.
+/// 2. Access: the permissions with a button each and a check mark once allowed; automatic pasting
+///    and iCloud apart under "Optional" (App Review 2.4.5, 2026-11-17); privacy in one line;
+///    Back and Start.
+/// Open at login is under both steps (one toggle). Everything left-aligned in one 500 pt column.
 private struct WelcomeView: View {
     @Environment(Activity.self) private var activity
     @State private var mic = Permissions.microphone
@@ -410,121 +505,33 @@ private struct WelcomeView: View {
     @State private var iCloud = ICloudSync.availability
     @State private var login = false
     @State private var loginError: String?
+    @State private var restoring = false
+
+    /// The column's width; the window is 560 wide.
+    private static let column: CGFloat = 500
+
+    private var step: Int { activity.welcomeStep }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 16) {
-                    // No sticker: the cassette as the picture, the words next to it.
-                    CassetteView(state: CassetteState()).frame(width: 96).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("welcome.title", "Welkom bij Bandje")).font(.title.weight(.bold))
-                        Text(tr("welcome.menubar", "Band·je staat rechtsboven in de menubalk: het cassettebandje."))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                ScrollView {
+                    Group {
+                        if step == 2 { accessStep } else { introStep }
                     }
+                    .frame(width: Self.column, alignment: .leading)
+                    .padding(.top, 24)
+                    .padding(.bottom, 16)
+                    // As tall as the window, so the last line sits at the bottom; scrolls only when
+                    // the window is made smaller than its content.
+                    .frame(minHeight: geometry.size.height, alignment: .top)
+                    .frame(maxWidth: .infinity)
                 }
-                group(tr("welcome.shortcuts", "Sneltoetsen")) {
-                    shortcut(Shortcut.record.display, tr("welcome.record", "Neemt een gesprek op: je microfoon en het geluid van je Mac. Daarna maakt Band·je er een transcript van."))
-                    Divider()
-                    shortcut(Shortcut.dictate.display, tr("welcome.dictate", "Dicteren: praat, en de tekst komt waar je cursor staat."))
-                } footer: {
-                    tr("welcome.shortcuts.change", "Aan te passen in Instellingen.")
-                }
-                group(tr("welcome.access", "Toegang")) {
-                    permission(tr("settings.permissions.mic", "Microfoon"), icon: "mic",
-                               note: tr("welcome.mic", "Om jou te horen bij opnemen en dicteren.")) {
-                        if mic == .allowed {
-                            allowed
-                        } else if mic == .notAsked {
-                            Button(tr("welcome.allow", "Sta toe…")) {
-                                Task { _ = await Permissions.microphoneAllowed(); mic = Permissions.microphone }
-                            }
-                        } else {
-                            Button(tr("settings.permissions.open", "Open instellingen…")) { Permissions.openSettings("Privacy_Microphone") }
-                        }
-                    }
-                    Divider()
-                    permission(tr("settings.permissions.paste", "Automatisch plakken"), icon: "keyboard",
-                               note: askedPaste ? tr("settings.permissions.paste.restart", "Net aangezet? macOS laat het Band·je pas zien na een herstart.")
-                                                : tr("welcome.paste", "Om gedicteerde tekst voor je te plakken (⌘V). Zonder staat de tekst op het klembord.")) {
-                        if paste {
-                            allowed
-                        } else if askedPaste {
-                            Button(tr("settings.language.restartNow", "Herstart Band·je")) { activity.restart() }
-                        } else {
-                            Button(tr("welcome.allow", "Sta toe…")) {
-                                Paste.requestPermission()
-                                askedPaste = true
-                            }
-                        }
-                    }
-                    Divider()
-                    permission(tr("settings.permissions.system", "Geluid van je Mac"), icon: "speaker.wave.2",
-                               note: tr("welcome.system", "Om het geluid van je Mac op te nemen: de andere kant van een gesprek.")) {
-                        if Permissions.systemAudio == .allowed {
-                            allowed
-                        } else {
-                            // macOS asks for it at the first recording; there is nothing to click yet.
-                            Text(tr("welcome.system.later", "Bij eerste opname")).foregroundStyle(.secondary)
-                        }
-                    }
-                    Divider()
-                    permission("iCloud", icon: "icloud",
-                               note: tr("welcome.icloud", "Je opnames ook op je iPhone en je andere Macs, via iCloud Drive. Kan ook later, in Instellingen.")) {
-                        if sync {
-                            allowed
-                        } else if iCloud == .available {
-                            Button(tr("welcome.icloud.on", "Zet aan…")) { sync = activity.setSync(true) }
-                        } else {
-                            // No iCloud account or iCloud Drive off: nothing to click here.
-                            Text(tr("welcome.icloud.unavailable", "Niet beschikbaar")).foregroundStyle(.secondary)
-                                .help(iCloud == .noAccount ? tr("settings.icloud.noAccount", "Log in bij iCloud en zet iCloud Drive aan in Systeeminstellingen.")
-                                                           : tr("settings.icloud.noContainer", "iCloud Drive is niet beschikbaar voor Band·je. Zet iCloud Drive aan in Systeeminstellingen > [je naam] > iCloud."))
-                        }
-                    }
-                } footer: {
-                    tr("welcome.privacy", "Alles blijft op je Mac, of in je eigen iCloud als je die aanzet. Verder gaat alleen een maandelijkse licentiecheck van het bedrijf achter het spraakmodel online, zonder audio of tekst.")
-                }
-                // Off unless ticked (App Review: nothing starts at login without consent).
-                Toggle(tr("settings.login.toggle", "Open Band·je bij inloggen"), isOn: $login)
-                if let loginError {
-                    Text(tr("settings.login.failed", "Openen bij inloggen lukte niet") + ": " + loginError)
-                        .font(.caption).foregroundStyle(.red)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Button {
-                        if login {
-                            do { try LoginItem.set(true) } catch { loginError = error.localizedDescription; login = false; return }
-                        }
-                        MainWindow.endWelcome()
-                    } label: {
-                        Text(tr("welcome.start", "Begin")).frame(minWidth: 120)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    // A darker red than the accent: white on it has enough contrast.
-                    .tint(Color(hex: 0xB0341C))
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
-                    if mic != .allowed {
-                        Text(tr("welcome.later", "Je kunt dit later toestaan.")).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("welcome.cheer", "Blijf vrolijk, er komen gekke tijden aan! Zoek elkaar op en hou van je buren."))
-                    HStack(spacing: 4) {
-                        Text(tr("welcome.madeBy", "Met liefde gemaakt door"))
-                        Link("Neurendal", destination: AboutView.neurendal)
-                            .foregroundStyle(Color.accent)
-                    }
-                }
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .frame(width: 500, alignment: .leading)
-            .padding(.vertical, 28)
-            .frame(maxWidth: .infinity)
+            pageDots
+            Divider()
+            bottomBar
         }
         // macOS doesn't tell when a permission changes in System Settings: look again every second.
         .task {
@@ -538,6 +545,241 @@ private struct WelcomeView: View {
         }
     }
 
+    // MARK: Step 1, getting to know
+
+    private var introStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            // No sticker: the cassette as the picture, the words next to it.
+            header(tr("welcome.title", "Welkom bij Bandje"),
+                   tr("welcome.menubar", "Band·je staat rechtsboven in de menubalk: het cassettebandje.")) {
+                CassetteView(state: CassetteState())
+            }
+            group(tr("welcome.shortcuts", "Sneltoetsen")) {
+                shortcut(Shortcut.record.display, tr("welcome.record", "Neemt een gesprek op: je microfoon en het geluid van je Mac. Daarna maakt Band·je er een transcript van."))
+                Divider()
+                // Without automatic pasting (optional) the user pastes: say so here (owner, 2026-11-17).
+                shortcut(Shortcut.dictate.display, paste ? tr("welcome.dictate", "Dicteren: praat, en de tekst komt waar je cursor staat.")
+                                                         : tr("welcome.dictate.clipboard", "Dicteren: praat, en je tekst staat op het klembord. Plak hem met ⌘V waar je cursor staat."))
+            } footer: {
+                tr("welcome.shortcuts.change", "Aan te passen in Instellingen.")
+            }
+            if let free = Store.welcomeFree {
+                VStack(alignment: .leading, spacing: 6) {
+                    heading(tr("welcome.free", "Gratis beginnen"))
+                    freeToStart(free)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+                Text(tr("welcome.madeBy", "Met liefde gemaakt door"))
+                Link("Neurendal", destination: AboutView.neurendal)
+                    .foregroundStyle(Color.accent)
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: Step 2, access
+
+    private var accessStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            // A big check mark in the cassette's place, so both headers line up.
+            header(tr("welcome.permissions", "Toegang"),
+                   tr("welcome.permissions.intro", "Wat Band·je nodig heeft om op te nemen, te dicteren en te synchroniseren.")) {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 54))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.accent)
+            }
+            group(nil) {
+                permission(tr("settings.permissions.mic", "Microfoon"), icon: "mic",
+                           note: tr("welcome.mic", "Om jou te horen bij opnemen en dicteren.")) {
+                    if mic == .allowed {
+                        allowed
+                    } else if mic == .notAsked {
+                        Button(tr("welcome.allow", "Sta toe…")) {
+                            Task { _ = await Permissions.microphoneAllowed(); mic = Permissions.microphone }
+                        }
+                    } else {
+                        Button(tr("settings.permissions.open", "Open instellingen…")) { Permissions.openSettings("Privacy_Microphone") }
+                    }
+                }
+                Divider()
+                permission(tr("settings.permissions.system", "Geluid van je Mac"), icon: "speaker.wave.2",
+                           note: tr("welcome.system", "Om het geluid van je Mac op te nemen: de andere kant van een gesprek.")) {
+                    SystemAudioPermissionControl(restart: { activity.restart() })
+                }
+            } footer: {
+                nil
+            }
+            // Optional extras, apart from what recording needs (App Review 2.4.5, 2026-11-17):
+            // Band·je works fully without them.
+            group(tr("welcome.optional", "Optioneel")) {
+                // Automatic pasting only in a build from source (App Review 2.4.5, see `Paste`).
+                #if !APPSTORE
+                permission(tr("settings.permissions.paste", "Automatisch plakken"), icon: "keyboard",
+                           note: askedPaste ? tr("settings.permissions.paste.restart", "Net aangezet? macOS laat het Band·je pas zien na een herstart.")
+                                            : tr("welcome.paste", "Om gedicteerde tekst voor je te plakken (⌘V). Zonder staat de tekst op het klembord.")) {
+                    if paste {
+                        allowed
+                    } else if askedPaste {
+                        Button(tr("settings.language.restartNow", "Herstart Band·je")) { activity.restart() }
+                    } else {
+                        Button(tr("welcome.paste.on", "Zet aan…")) {
+                            Paste.requestPermission()
+                            askedPaste = true
+                        }
+                    }
+                }
+                Divider()
+                #endif
+                permission("iCloud", icon: "icloud",
+                           note: tr("welcome.icloud", "Je opnames ook op je iPhone en je andere Macs, via iCloud Drive. Kan ook later, in Instellingen.")) {
+                    if sync {
+                        allowed
+                    } else if iCloud == .available {
+                        Button(tr("welcome.icloud.on", "Zet aan…")) { sync = activity.setSync(true) }
+                    } else {
+                        // No iCloud account or iCloud Drive off: nothing to click here.
+                        Text(tr("welcome.icloud.unavailable", "Niet beschikbaar")).foregroundStyle(.secondary)
+                            .help(iCloud == .noAccount ? tr("settings.icloud.noAccount", "Log in bij iCloud en zet iCloud Drive aan in Systeeminstellingen.")
+                                                       : tr("settings.icloud.noContainer", "iCloud Drive is niet beschikbaar voor Band·je. Zet iCloud Drive aan in Systeeminstellingen > [je naam] > iCloud."))
+                    }
+                }
+            } footer: {
+                (Paste.available ? tr("welcome.optional.footer", "Band·je werkt volledig zonder. Zonder automatisch plakken staat gedicteerde tekst op het klembord en plak je zelf met ⌘V.") + "\n\n" : "")
+                    + tr("welcome.privacy", "Alles blijft op je Mac, of in je eigen iCloud als je die aanzet. Verder gaat alleen een maandelijkse licentiecheck van het bedrijf achter het spraakmodel online, zonder audio of tekst.")
+            }
+        }
+    }
+
+    // MARK: Bottom
+
+    /// Two small dots: where you are.
+    private var pageDots: some View {
+        HStack(spacing: 7) {
+            ForEach(1...2, id: \.self) { n in
+                Circle()
+                    .fill(n == step ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .padding(.bottom, 12)
+        .accessibilityElement()
+        .accessibilityLabel(Text(tr("welcome.step", "Stap %1$@ van %2$@", "\(step)", "2")))
+    }
+
+    /// Back (step 2), Open at login, and Next or Start; under Start that the permissions can wait.
+    private var bottomBar: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 14) {
+                if step == 2 {
+                    Button {
+                        go(to: 1)
+                    } label: {
+                        Label(tr("welcome.back", "Terug"), systemImage: "chevron.left")
+                    }
+                    .controlSize(.large)
+                    .keyboardShortcut(.cancelAction)
+                    .background {
+                        // ⌘[ as in Finder and Safari, besides Esc.
+                        Button("") { go(to: 1) }
+                            .keyboardShortcut("[", modifiers: .command)
+                            .opacity(0)
+                            .accessibilityHidden(true)
+                    }
+                }
+                // Off unless ticked (App Review: nothing starts at login without consent).
+                Toggle(tr("settings.login.toggle", "Open Band·je bij inloggen"), isOn: $login)
+                Spacer(minLength: 8)
+                Button {
+                    if step == 2 { start() } else { go(to: 2) }
+                } label: {
+                    Text(step == 2 ? tr("welcome.start", "Begin") : tr("welcome.next", "Volgende")).frame(minWidth: 96)
+                }
+                .buttonStyle(.borderedProminent)
+                // A darker red than the accent: white on it has enough contrast.
+                .tint(Color(hex: 0xB0341C))
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+            }
+            // One line under the buttons, also when empty, so the bar doesn't move between the steps.
+            HStack(alignment: .firstTextBaseline) {
+                if let loginError {
+                    Text(tr("settings.login.failed", "Openen bij inloggen lukte niet") + ": " + loginError)
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                Spacer(minLength: 8)
+                Text(tr("welcome.later", "Je kunt dit later toestaan."))
+                    .foregroundStyle(.secondary)
+                    .opacity(step == 2 && mic != .allowed ? 1 : 0)
+                    .accessibilityHidden(!(step == 2 && mic != .allowed))
+            }
+            .font(.caption)
+        }
+        .frame(width: Self.column)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func go(to page: Int) {
+        withAnimation(.easeInOut(duration: 0.2)) { activity.welcomeStep = page }
+    }
+
+    private func start() {
+        if login {
+            do { try LoginItem.set(true) } catch { loginError = error.localizedDescription; login = false; return }
+        }
+        MainWindow.endWelcome()
+    }
+
+    /// What is free and what comes after (App Store build only), with Restore for who bought it
+    /// already; once everything is unlocked, only a thank-you.
+    @ViewBuilder private func freeToStart(_ free: Store.WelcomeFree) -> some View {
+        if free == .unlocked {
+            Label {
+                Text(tr("welcome.free.unlocked", "Alles is ontgrendeld. Dank je wel!"))
+            } icon: {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Group {
+                    if free == .dictationOwned {
+                        // Band·je Dicteren bought: only transcribing is still limited.
+                        Text(tr("welcome.free.dictationOwned", "Opnemen is altijd gratis, en je eerste %1$@ transcripties krijg je van ons, alles op je Mac. %2$@ is ontgrendeld; onbeperkt transcriberen zit in %3$@: één keer betalen, geen abonnement.",
+                                "\(FreeAllowance.transcriptions)", Store.name(.dictation), Store.name(.unlimited)))
+                    } else {
+                        Text(tr("welcome.free.text", "Opnemen is altijd gratis, en je eerste %1$@ transcripties en %2$@ minuten dicteren krijg je van ons, alles op je Mac. Daarna kies je %3$@ (alles) of %4$@: één keer betalen, geen abonnement.",
+                                "\(FreeAllowance.transcriptions)", "\(Int(FreeAllowance.dictationSeconds / 60))",
+                                Store.name(.unlimited), Store.name(.dictation)))
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 6) {
+                    Button(tr("welcome.free.restore", "Al gekocht? Herstel aankopen")) {
+                        restoring = true
+                        // The same as Settings: asks the App Store, then says what it found.
+                        Task { await Store.restore(alert: true); restoring = false }
+                    }
+                    .buttonStyle(.link)
+                    .foregroundStyle(Color.accent)  // as the Neurendal link
+                    .disabled(restoring)
+                    if restoring { ProgressView().controlSize(.small) }
+                }
+                .font(.callout)
+            }
+        }
+    }
+
     private var allowed: some View {
         Image(systemName: "checkmark.circle.fill")
             .font(.title3)
@@ -545,14 +787,35 @@ private struct WelcomeView: View {
             .accessibilityLabel(Text(tr("settings.permissions.allowed", "Toegestaan")))
     }
 
-    /// A small grey heading, a card with rows, and a small grey line under it.
-    private func group(_ title: String, @ViewBuilder _ rows: () -> some View, footer: () -> String) -> some View {
+    /// A step's top: a picture in a 96 × 64 slot, a big title and a line under it.
+    private func header(_ title: String, _ subtitle: String, @ViewBuilder picture: () -> some View) -> some View {
+        HStack(spacing: 16) {
+            picture()
+                .frame(width: 96, height: 64)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.title.weight(.bold))
+                Text(subtitle)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func heading(_ title: String) -> some View {
+        Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+    }
+
+    /// A small grey heading (optional), a card with rows, and a small grey line under it (optional).
+    private func group(_ title: String?, @ViewBuilder _ rows: () -> some View, footer: () -> String?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            if let title { heading(title) }
             VStack(spacing: 0) { rows() }
                 .padding(.horizontal, 14)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-            Text(footer()).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let footer = footer() {
+                Text(footer).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -644,22 +907,49 @@ private struct RecordScreen: View {
                         .monospacedDigit()
                 }
             }
+            // How many flags (Markeer dit moment); the line keeps its place so nothing jumps.
+            Text(Self.markerCount(activity.recordingMarkers))
+                .font(.callout)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .opacity(activity.recordingMarkers > 0 ? 1 : 0)
+                .accessibilityHidden(activity.recordingMarkers == 0)
             Spacer(minLength: 0)
-            Button {
-                activity.toggleRecording()
-            } label: {
-                Image(systemName: "stop.fill")
-                    .font(.title)
-                    .foregroundStyle(.red)
-                    .frame(width: 72, height: 72)
-                    .background(Circle().fill(.quaternary))
+            HStack(spacing: 32) {
+                Button {
+                    activity.mark()
+                } label: {
+                    Image(systemName: "flag.fill")
+                        .font(.title2)
+                        .foregroundStyle(Color(hex: 0xD2442A))
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(.quaternary))
+                }
+                .buttonStyle(.plain)
+                .help(tr("menu.mark", "Markeer dit moment") + "  " + Shortcut.mark.display)
+                .accessibilityLabel(Text(tr("menu.mark", "Markeer dit moment")))
+                Button {
+                    activity.toggleRecording()
+                } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.title)
+                        .foregroundStyle(.red)
+                        .frame(width: 72, height: 72)
+                        .background(Circle().fill(.quaternary))
+                }
+                .buttonStyle(.plain)
+                .help(tr("menu.record.stop", "Stop opname") + "  " + Shortcut.record.display)
+                .accessibilityLabel(Text(tr("menu.record.stop", "Stop opname")))
+                // As wide as the flag, so Stop stays in the middle.
+                Color.clear.frame(width: 52, height: 52).accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .help(tr("menu.record.stop", "Stop opname") + "  " + Shortcut.record.display)
-            .accessibilityLabel(Text(tr("menu.record.stop", "Stop opname")))
             .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    static func markerCount(_ n: Int) -> String {
+        n == 1 ? tr("record.markers.one", "1 markering") : tr("window.markers", "%@ markeringen", "\(n)")
     }
 }
 
@@ -693,7 +983,6 @@ private struct LibraryList: View {
     let query: String
     @Environment(Library.self) private var library
     @Environment(Activity.self) private var activity
-    @Environment(AudioPlayer.self) private var player
     /// The recording to confirm deleting (right-click › Verwijder…, or Delete in the list).
     @State private var toDelete: Recording?
     @State private var error: String?
@@ -782,8 +1071,8 @@ private struct LibraryList: View {
     private func delete(_ recording: Recording) {
         Task {
             do {
-                if player.url?.deletingLastPathComponent().standardizedFileURL == recording.folder.standardizedFileURL { player.unload() }
                 try await library.delete(recording)
+                Playback.removed(recording)  // P9
                 if selection == recording.folder { selection = nil }
             } catch {
                 self.error = error.localizedDescription
@@ -814,6 +1103,11 @@ private struct LibraryList: View {
                         }
                     } else if recording.transcript != nil {
                         Image(systemName: "text.quote").accessibilityLabel(Text(tr("window.transcript", "Transcript")))
+                    }
+                    if ICloudSync.isWaiting(recording.folder) {
+                        Image(systemName: "icloud.slash")
+                            .help(tr("icloud.pending.title", "Nog niet in iCloud"))
+                            .accessibilityLabel(Text(tr("icloud.pending.title", "Nog niet in iCloud")))
                     }
                 }
                 .font(.caption)

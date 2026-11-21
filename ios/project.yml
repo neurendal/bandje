@@ -17,8 +17,8 @@ settings:
     DEVELOPMENT_TEAM: KKWHW59YC3
     CODE_SIGN_STYLE: Automatic
     TARGETED_DEVICE_FAMILY: "1,2"
-    MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "3"
+    MARKETING_VERSION: "1.1.0"
+    CURRENT_PROJECT_VERSION: "13"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     SWIFT_EMIT_LOC_STRINGS: YES
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
@@ -27,6 +27,9 @@ packages:
   desert-ant-core:
     url: https://github.com/Desert-Ant-Labs/desert-ant-core.git
     exactVersion: "4.2.3"
+  # Shared with the Mac app (BandjeKit), next to this repo.
+  BandjeKit:
+    path: ../bandje-core
 
 targets:
   Bandje:
@@ -35,13 +38,19 @@ targets:
     sources:
       - path: Bandje
       - path: Shared
+      # The Watch's transfer format (docs/watch.md 4), shared with the Watch app.
+      - path: WatchShared
     dependencies:
       - package: desert-ant-core
         product: Voz
       - package: desert-ant-core
         product: Who
+      - package: BandjeKit
+        product: BandjeKit
       - target: BandjeShare
       - target: BandjeWidgets
+      # The Watch app (docs/watch.md), embedded under Watch/ so it ships in the same archive.
+      - target: BandjeWatch
     entitlements:
       path: Bandje/Bandje.entitlements
       properties:
@@ -164,11 +173,90 @@ targets:
         # The shared intents do their work only in the app (Shared/RecordingIntents.swift).
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
 
+  # Apple Watch app (docs/watch.md): records, marks, sends to the iPhone with WatchConnectivity.
+  # Apple frameworks only: no desert-ant-core, no BandjeKit.
+  BandjeWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: BandjeWatch
+      # The transfer format, shared with the iPhone app.
+      - path: WatchShared
+    dependencies:
+      - target: BandjeWatchWidgets
+    entitlements:
+      path: BandjeWatch/BandjeWatch.entitlements
+      properties:
+        # Recording state for the complications, Smart Stack and the Control (on the Watch only).
+        com.apple.security.application-groups: [group.com.neurendal.bandje]
+    info:
+      path: BandjeWatch/Info.plist
+      properties:
+        CFBundleDisplayName: "Band·je"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, nl, de, fr, es, it, pt, pl, ru, uk]
+        INAlternativeAppNames:
+          - INAlternativeAppName: Bandje
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.neurendal.bandje
+        # Recordings end up in the iPhone's library; the Watch app needs the iPhone app.
+        WKRunsIndependentlyOfCompanionApp: false
+        # Keeps recording with the wrist down and the screen off (prototype, 8 Nov 2026). watchOS
+        # takes background audio as UIBackgroundModes; App Store validation rejects `audio` under
+        # WKBackgroundModes (that key is for workout and other sessions), 12 Nov 2026.
+        UIBackgroundModes: [audio]
+        NSMicrophoneUsageDescription: "Band·je records with the microphone. Recordings move to Band·je on your iPhone."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje.watchkitapp
+        SDKROOT: watchos
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme: {}
+
+  BandjeWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: BandjeWatchWidgets
+      # State, intents, colours, cassette and strings shared with the Watch app.
+      - path: BandjeWatch/Common
+    entitlements:
+      path: BandjeWatchWidgets/BandjeWatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.neurendal.bandje]
+    info:
+      path: BandjeWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: "Band·je"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, nl, de, fr, es, it, pt, pl, ru, uk]
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neurendal.bandje.watchkitapp.widgets
+        SDKROOT: watchos
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
+        # The intents do their work only in the Watch app (BandjeWatch/Common/WatchIntents.swift).
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
+
   BandjeTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: BandjeTests
+      # SKTestSession(configurationFileNamed: "Bandje") in PurchaseTests.
+      - path: StoreKit/Bandje.storekit
+        buildPhase: resources
     dependencies:
       - target: Bandje
     settings:
@@ -191,6 +279,10 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: Bandje
 
+# Local StoreKit testing (specs/purchase.md): the two in-app purchases, EUR prices. Not part of any target.
+fileGroups:
+  - StoreKit
+
 schemes:
   Bandje:
     build:
@@ -198,6 +290,9 @@ schemes:
         Bandje: all
         BandjeTests: [test]
         BandjeUITests: [test]
+    run:
+      config: Debug
+      storeKitConfiguration: StoreKit/Bandje.storekit
     test:
       gatherCoverageData: false
       targets:

@@ -1,4 +1,5 @@
 import AVFoundation
+import BandjeKit
 import Foundation
 import Voz
 import Who
@@ -14,13 +15,24 @@ actor Transcriber {
     static let shared = Transcriber()
 
     enum Status: Sendable {
-        /// A model is being loaded; `firstTime` when it was never loaded on this Mac before
-        /// (Core ML then specializes it for the chip, which takes the longest).
-        /// `expected`: about how many seconds the load takes (for an estimated %; the SDK has no
-        /// progress for loading).
-        case loading(firstTime: Bool, expected: Double)
+        /// A model is being loaded: Voz (`speech`) or Who (`speakers`). `firstTime` when it did not
+        /// load yet since this app build was installed (Core ML then specializes it for the chip,
+        /// which takes the longest). `expected`: about how many seconds the load takes (for an
+        /// estimated %; the SDK has no progress for loading).
+        case loading(Model, firstTime: Bool, expected: Double)
         case transcribing(Double)
     }
+    enum Model: Sendable { case speech, speakers }
+
+    /// Whether `model` loaded once with this app build (the iPhone's `prepared.<model>` keys; here
+    /// the build number, since an update on the Mac keeps the app's path).
+    private static func isPrepared(_ model: String) -> Bool {
+        UserDefaults.standard.string(forKey: "prepared.\(model)") == build
+    }
+    private static func markPrepared(_ model: String) {
+        UserDefaults.standard.set(build, forKey: "prepared.\(model)")
+    }
+    private static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "" }
 
     /// An estimated % for a load that reports no progress: elapsed against expected, at most 95
     /// until the load is really done.
@@ -65,13 +77,13 @@ actor Transcriber {
     private func loadVoz(status: @Sendable (Status) -> Void) throws -> Voz {
         if let voz { lastLoadSeconds = 0; return voz }
         guard Self.modelsPresent() else { throw TranscriberError(message: Self.missingModels) }
-        let firstTime = !UserDefaults.standard.bool(forKey: "vozLoadedOnce")
-        status(.loading(firstTime: firstTime, expected: Self.expectedVozLoad(firstTime: firstTime)))
+        let firstTime = !Self.isPrepared("voz")
+        status(.loading(.speech, firstTime: firstTime, expected: Self.expectedVozLoad(firstTime: firstTime)))
         let t0 = Date()
         do {
             let loaded = try Voz(modelDirectory: Self.vozDirectory)
             lastLoadSeconds = Date().timeIntervalSince(t0)
-            UserDefaults.standard.set(true, forKey: "vozLoadedOnce")
+            Self.markPrepared("voz")
             UserDefaults.standard.set(lastLoadSeconds, forKey: "vozLoadSeconds")
             voz = loaded
             return loaded
@@ -119,7 +131,11 @@ actor Transcriber {
         t.title = TranscriptWriter.title(forBaseName: audio.deletingPathExtension().lastPathComponent)
         t.audioFile = audio.lastPathComponent
         t.duration = duration
-        if let meta = RecordingMeta.read(from: audio.deletingLastPathComponent()) { TranscriptWriter.apply(meta, to: &t) }
+        if let meta = RecordingMeta.read(from: audio.deletingLastPathComponent()) {
+            TranscriptWriter.apply(meta, to: &t)
+            // The markers with their notes (`.markers.json`), as the window and exports show them.
+            TranscriptWriter.apply(Markers.read(from: audio.deletingLastPathComponent()), to: &t)
+        }
         let md = try TranscriptWriter.write(t, for: audio, in: directory)
         status(.transcribing(1))
         return (md, t)
@@ -199,8 +215,6 @@ actor Transcriber {
     /// Who's result before the minimum-share filter, for the selftest.
     private(set) var lastRawWho = ""
 
-    /// Checked before every Who use: `Who(directory:)` downloads into the folder when the model is
-    /// not there, so it must only ever be built for a folder that already holds it.
     /// Instellingen › Transcriptie › Sprekers herkennen (on by default, the iPhone's key): off,
     /// own recordings keep Ik / the other side, other files get the text without speakers.
     static var detectSpeakers: Bool {
@@ -208,6 +222,8 @@ actor Transcriber {
         set { UserDefaults.standard.set(newValue, forKey: "detectSpeakers") }
     }
 
+    /// Checked before every Who use: `Who(directory:)` downloads into the folder when the model is
+    /// not there, so it must only ever be built for a folder that already holds it.
     static func whoPresent() -> Bool {
         Who.isDownloaded(directory: whoDirectory.path)
     }
@@ -217,8 +233,8 @@ actor Transcriber {
         let who = self.who ?? Who(directory: Self.whoDirectory.path)
         self.who = who
         if !whoLoaded {
-            let firstTime = !UserDefaults.standard.bool(forKey: "whoLoadedOnce")
-            status(.loading(firstTime: firstTime, expected: firstTime ? 15 : 5))
+            let firstTime = !Self.isPrepared("who")
+            status(.loading(.speakers, firstTime: firstTime, expected: firstTime ? 15 : 5))
         }
         let result: Diarization
         do {
@@ -229,7 +245,7 @@ actor Transcriber {
             throw TranscriberError(message: tr("error.who", "Sprekerherkenning (Who) mislukt (%@). Draai scripts/fetch-models.sh opnieuw als het model beschadigd is.", "\(error)"))
         }
         whoLoaded = true
-        UserDefaults.standard.set(true, forKey: "whoLoadedOnce")
+        Self.markPrepared("who")
         return result.turns.map { TranscriptWriter.SpeakerTurn(start: $0.start, end: $0.end, speaker: $0.speaker) }
     }
 
@@ -274,15 +290,13 @@ actor Transcriber {
         while true {
             var readError: Error?
             let status = converter.convert(to: outBuf, error: nil) { _, inputStatus in
-                // Reading at the end throws instead of returning 0 frames, so stop on the position.
-                let remaining = file.length - file.framePosition
-                if finished || remaining <= 0 { finished = true; inputStatus.pointee = .endOfStream; return nil }
-                do {
-                    try file.read(into: inBuf, frameCount: AVAudioFrameCount(min(Int64(inBuf.frameCapacity), remaining)))
-                } catch {
-                    readError = error
+                // readNext (BandjeKit): false at the end, also when the file promised a few frames
+                // more than it holds (AAC taken out of a video, e.g. imported on the iPhone).
+                var more = false
+                if !finished {
+                    do { more = try file.readNext(into: inBuf) } catch { readError = error }
                 }
-                if inBuf.frameLength == 0 || readError != nil {
+                guard more else {
                     finished = true
                     inputStatus.pointee = .endOfStream
                     return nil

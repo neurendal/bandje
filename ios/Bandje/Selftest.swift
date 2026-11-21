@@ -2,13 +2,14 @@
 #if DEBUG
 import ActivityKit
 import AVFoundation
+import BandjeKit
 import Foundation
 import FoundationModels
 import SwiftUI
 import Voz
 import Who
 
-/// DEBUG-only launch arguments for automated tests in the simulator (see OVERNIGHT.md 3).
+/// DEBUG-only launch arguments for automated tests in the simulator.
 /// Every mode writes its outcome to Documents/selftest/last.json. Compiled out of Release.
 struct SelftestOptions: Equatable, Sendable {
     var fakeMic: String?
@@ -113,6 +114,11 @@ enum Selftest {
         if options.reset {
             resetDocuments()
             UserDefaults.standard.removeObject(forKey: "consentShown")  // the one-time notice shows again
+            // Settings back to their defaults: a run that stopped halfway through the About test
+            // left "Transcribe automatically" on, and every later import then transcribed by itself.
+            UserDefaults.standard.removeObject(forKey: "autoTranscribe")
+            // The player's positions and speed of earlier runs (Playback keeps them in this suite).
+            UserDefaults.standard.removePersistentDomain(forName: Playback.selftestSuite)
         }
         if options.checkModels { write(checkModels()) }
     }
@@ -239,21 +245,21 @@ enum Selftest {
             write(result)
             return
         }
-        let player = Player.shared
-        player.volume = 0
+        let player = Playback.player
+        Playback.engine.volume = 0
         for rate: Float in [1, 2] {
-            player.unload()
-            player.load(recording)
-            player.setRate(rate)
-            player.play()
+            Playback.stop()
+            player.rate = rate
+            guard let item = recording.playable else { break }
+            await player.play(item, at: 0).value
             try? await Task.sleep(for: .seconds(3))
-            player.pause()
-            result["moved@\(rate)"] = player.currentTime
             result["playing@\(rate)"] = player.isPlaying
-            result["error@\(rate)"] = player.errorMessage as Any
+            player.pause(reason: .user)
+            result["moved@\(rate)"] = player.currentTime
+            result["error@\(rate)"] = Playback.failure as Any
         }
-        player.setRate(1)
-        player.unload()
+        player.rate = 1
+        Playback.stop()
         let one = result["moved@1.0"] as? Double ?? 0, two = result["moved@2.0"] as? Double ?? 0
         result["ok"] = two > one * 1.6
         write(result)
@@ -637,6 +643,27 @@ enum Selftest {
 
     enum DemoRoute { case open(Recording), record, about, onboarding }
 
+    /// Scrolls every scroll view on screen to its end once a sheet is up (Settings, the welcome),
+    /// for screenshots of what is below the fold.
+    @MainActor
+    static func scrollToBottomSoon() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            @MainActor func scroll(_ view: UIView) {
+                if let scroll = view as? UIScrollView {
+                    let bottom = scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom
+                    if bottom > -scroll.adjustedContentInset.top {
+                        scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: bottom), animated: false)
+                    }
+                }
+                view.subviews.forEach(scroll)
+            }
+            for scene in UIApplication.shared.connectedScenes {
+                (scene as? UIWindowScene)?.windows.forEach(scroll)
+            }
+        }
+    }
+
     /// `--demo-state <name>`: puts the UI in a fixed state with sample data (after `--reset`).
     /// `idle`: detail of a 12:30 recording, stopped at 0. `playing-10` / `playing-90`: the same,
     /// playing from 10 % / 90 %. `recording`: the record screen, recording from a generated
@@ -656,11 +683,9 @@ enum Selftest {
                 guard let recording = library.recordings.first(where: { $0.folder.standardizedFileURL == folder.standardizedFileURL }) else {
                     throw RecorderError(message: "demo recording not in library")
                 }
-                let player = Player.shared
-                player.load(recording)
+                Playback.seek(recording, to: 0)
                 if name.hasPrefix("playing-"), let percent = Double(name.dropFirst("playing-".count)) {
-                    player.seek(to: player.duration * percent / 100)
-                    player.play()
+                    Playback.play(recording, at: recording.duration * percent / 100)
                 }
                 result["ok"] = true
                 return .open(recording)
@@ -680,12 +705,8 @@ enum Selftest {
                 case "error": Transcriptions.shared.errors[folder.standardizedFileURL] = Transcriber.missingModels
                 default: break
                 }
-                let player = Player.shared
-                player.load(recording)
-                if name == "transcript" {
-                    player.seek(to: 21)
-                    player.play()
-                }
+                Playback.seek(recording, to: 0)
+                if name == "transcript" { Playback.play(recording, at: 21) }
                 result["ok"] = true
                 return .open(recording)
             case "library", "import-error":
@@ -716,13 +737,11 @@ enum Selftest {
                 // The sample: the newest with a summary (the English library has a newer call without one).
                 guard let recording = library.recordings.first(where: { $0.summary != nil && $0.transcript != nil })
                         ?? library.recordings.first else { throw RecorderError(message: "empty library") }
-                Player.shared.load(recording)
                 if let seek = options.seek {
                     // Paused there: the transcript opens at that sentence, highlighted.
-                    Player.shared.seek(to: seek)
+                    Playback.seek(recording, to: seek)
                 } else {
-                    Player.shared.seek(to: min(40, Player.shared.duration / 3))
-                    Player.shared.play()
+                    Playback.play(recording, at: min(40, recording.duration / 3))
                 }
                 result["ok"] = true
                 return .open(recording)

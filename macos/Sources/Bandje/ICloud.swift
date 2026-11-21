@@ -56,7 +56,7 @@ enum Files {
     }
 }
 
-/// "Synchroniseer via iCloud" (Instellingen, default off; CLAUDE.md limit 8). Recordings,
+/// "Synchroniseer via iCloud" (Instellingen, default off). Recordings,
 /// transcripts, summaries and templates then live in the user's iCloud Drive › Band·je, shared with
 /// the iPhone app (bandje-ios docs/icloud-sync.md). Recording happens in a local staging folder;
 /// the finished folder moves to iCloud with `setUbiquitous`. macOS syncs; our code has no network.
@@ -114,7 +114,10 @@ enum ICloudSync {
 
     /// Makes sure `url` is on this Mac: returns at once for a local or downloaded file, else starts
     /// the download and waits until it is there (audio from the iPhone before playing or transcribing).
-    static func ensureDownloaded(_ url: URL, timeout: TimeInterval = 300) async throws {
+    /// A local copy that is not the newest version (`.downloaded`: iCloud has a newer one, or can't
+    /// be asked while offline) is used after `grace` seconds instead of waiting the whole `timeout`;
+    /// `grace` nil waits for the newest version.
+    static func ensureDownloaded(_ url: URL, timeout: TimeInterval = 300, grace: TimeInterval? = 5) async throws {
         func status() -> URLUbiquitousItemDownloadingStatus? {
             var u = url
             u.removeAllCachedResourceValues()
@@ -124,17 +127,25 @@ enum ICloudSync {
         }
         if status() == .current { return }
         try? FileManager.default.startDownloadingUbiquitousItem(at: url)
-        let deadline = Date().addingTimeInterval(timeout)
+        let start = Date(), deadline = start.addingTimeInterval(timeout)
         while Date() < deadline {
             try await Task.sleep(for: .milliseconds(500))
-            if status() == .current { return }
+            let now = status()
+            if now == .current { return }
+            if now == .downloaded, let grace, Date().timeIntervalSince(start) >= grace { return }
         }
         throw DownloadError(file: url.lastPathComponent)
     }
 
-    /// The name `folder` gets in `target`: the same, or ` 2`, ` 3`… when taken there.
-    static func publishName(for name: String, in target: URL) -> String {
-        OutputLocation.uniqueName(name, in: target)
+    /// Moves a finished recording folder from the staging folder to the local recordings folder
+    /// `target` (sync turned off): under a free name, with the files following it (" 2").
+    /// Returns the new folder.
+    nonisolated static func moveLocal(_ folder: URL, into target: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        let destination = target.appendingPathComponent(OutputLocation.uniqueName(folder.lastPathComponent, in: target), isDirectory: true)
+        try Files.move(folder, to: destination)
+        Library.renameFilesAfterMove(in: destination, from: folder.lastPathComponent, to: destination.lastPathComponent)
+        return destination
     }
 
     /// Moves a finished recording folder into iCloud (`target` = `documents`); returns the new folder.
@@ -149,27 +160,136 @@ enum ICloudSync {
     /// When the name is taken in `target`, renames the local folder and its files to the free name
     /// first (` 2`), so folder and files keep matching. Returns the folder to move.
     nonisolated static func preparePublish(_ folder: URL, into target: URL) throws -> URL {
-        let name = publishName(for: folder.lastPathComponent, in: target)
+        let name = OutputLocation.uniqueName(folder.lastPathComponent, in: target)  // the same, or " 2" when taken there
         guard name != folder.lastPathComponent else { return folder }
         let renamed = folder.deletingLastPathComponent().appendingPathComponent(name, isDirectory: true)
         try Files.move(folder, to: renamed)
-        try Library.renameFiles(in: renamed, from: folder.lastPathComponent, to: name)
+        Library.renameFilesAfterMove(in: renamed, from: folder.lastPathComponent, to: name)
         return renamed
     }
 
     /// Copies a recording folder into `target` (downloading what is still in iCloud), under a free
     /// name; files follow a new name. Off the main thread: it can be gigabytes.
     static func copyRecording(_ folder: URL, into target: URL) async throws -> URL {
+        // Nothing to copy (the folder can't be read, or its audio is gone) is a failure, not an empty copy.
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        guard Library.audioFile(in: folder) != nil else {
+            throw RecorderError(message: tr("audio.empty", "%@ bevat geen bruikbare audio.", folder.lastPathComponent))
+        }
         let name = OutputLocation.uniqueName(folder.lastPathComponent, in: target)
         let destination = target.appendingPathComponent(name, isDirectory: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        for file in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [] {
-            try await ensureDownloaded(file)
-            try await Task.detached(priority: .utility) { try Files.copy(file, to: destination.appendingPathComponent(file.lastPathComponent)) }.value
+        do {
+            for file in files {
+                // Sync turns off: the copy must be the newest version, not an older local one.
+                try await ensureDownloaded(file, grace: nil)
+                try await Task.detached(priority: .utility) { try Files.copy(file, to: destination.appendingPathComponent(file.lastPathComponent)) }.value
+            }
+        } catch {
+            // Half a copy (the disk filled up, a download failed) would show as a broken recording,
+            // and a second try would make another one next to it.
+            try? FileManager.default.removeItem(at: destination)
+            throw error
         }
-        try Library.renameFiles(in: destination, from: folder.lastPathComponent, to: name)
+        Library.renameFilesAfterMove(in: destination, from: folder.lastPathComponent, to: name)
         return destination
     }
+
+    // MARK: The same recording on both sides (owner, 2026-11-09)
+    //
+    // Turning sync off with Copy and on again with Move made every recording a second time ("Name 2"),
+    // each round. A recording is the same when `.bandje.json` has the same `created` and the lengths
+    // differ by at most a second; the name may differ.
+
+    /// The recording folders in `dir` by their `created` (folders without `.bandje.json` are left out).
+    nonisolated static func byCreated(_ dir: URL) -> [Date: [URL]] {
+        var out: [Date: [URL]] = [:]
+        for folder in OutputLocation.recordingFolders(in: dir) {
+            if let created = RecordingMeta.read(from: folder)?.created { out[created, default: []].append(folder) }
+        }
+        return out
+    }
+
+    enum Counterpart: Equatable {
+        /// No recording with the same `created`.
+        case none
+        /// The same recording: same `created`, lengths within a second.
+        case same(URL)
+        /// Same `created`, but a length is unknown (audio still in iCloud, no transcript) or differs.
+        case doubt(URL)
+    }
+
+    /// The length of the recording in `folder`, nil when unknown (local audio, `.bandje.json` or the transcript).
+    nonisolated static func length(of folder: URL) -> TimeInterval? {
+        let d = Library.duration(of: folder)
+        return d > 0 ? d : nil
+    }
+
+    /// The recording in `index` (`byCreated` of the other side) that is the same as `folder`.
+    nonisolated static func counterpart(of folder: URL, in index: [Date: [URL]]) -> Counterpart {
+        guard let created = RecordingMeta.read(from: folder)?.created, let candidates = index[created], !candidates.isEmpty else { return .none }
+        let mine = length(of: folder)
+        for other in candidates where other.standardizedFileURL != folder.standardizedFileURL {
+            if let mine, let theirs = length(of: other), abs(mine - theirs) <= 1 { return .same(other) }
+        }
+        return candidates.first { $0.standardizedFileURL != folder.standardizedFileURL }.map { .doubt($0) } ?? .none
+    }
+
+    /// True when `copy` holds everything `folder` has: every file (a name that starts with the folder's
+    /// name follows the other folder's name), with the same size where both sizes are known, and an
+    /// audio file. The cover image and half files don't count. Downloaded or not does not matter.
+    nonisolated static func holdsEverything(_ copy: URL, of folder: URL) -> Bool {
+        let fm = FileManager.default
+        guard Library.audioFile(in: copy) != nil,
+              let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey]) else { return false }
+        let old = folder.lastPathComponent, new = copy.lastPathComponent
+        func size(_ url: URL) -> Int? { try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize }
+        for file in files {
+            let name = file.lastPathComponent
+            if name == ".DS_Store" || name.hasPrefix(".cover-") || name.hasPrefix(".embedding-") || name.contains(".converting.") { continue }
+            if (try? file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true { return false }
+            let mapped = name.hasPrefix(old + ".") || name.hasPrefix(old + " ") ? new + name.dropFirst(old.count) : name
+            let other = copy.appendingPathComponent(mapped)
+            guard fm.fileExists(atPath: other.path) else { return false }
+            if let a = size(file), let b = size(other), a != b { return false }
+        }
+        return true
+    }
+
+    enum MoveOutcome: Equatable {
+        /// Moved into iCloud.
+        case moved
+        /// Already in iCloud, complete: the local folder went to the Trash.
+        case alreadyThere
+        /// Possibly already in iCloud but not certainly the same or complete: left where it is.
+        case keptLocal
+    }
+
+    /// Turning sync on with Move, for one local recording folder: moved into `target`, unless the
+    /// same recording is already there. Then the local folder goes to the Trash (never deleted
+    /// outright) only when the iCloud copy holds everything; in doubt it stays where it is.
+    nonisolated static func moveIn(_ folder: URL, into target: URL, index: [Date: [URL]],
+                                   toTrash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws -> MoveOutcome {
+        switch counterpart(of: folder, in: index) {
+        case .none:
+            _ = try publish(folder, into: target)
+            return .moved
+        case .same(let copy) where holdsEverything(copy, of: folder):
+            try toTrash(folder)
+            return .alreadyThere
+        case .same, .doubt:
+            return .keptLocal
+        }
+    }
+
+    /// True when the recording `folder` is in the staging folder.
+    static func isStaged(_ folder: URL) -> Bool {
+        folder.deletingLastPathComponent().standardizedFileURL.path == staging.standardizedFileURL.path
+    }
+
+    /// A recording folder that waits in the staging folder while sync is on: not in iCloud yet
+    /// (the library's mark). Read from where the folder is, so it can never be out of date.
+    static func isWaiting(_ folder: URL) -> Bool { isOn && isStaged(folder) }
 
     /// Staging folders that are finished (converted to `.m4a`, `.bandje.json` no longer recording):
     /// left behind by a crash or a failed move.
@@ -186,19 +306,59 @@ enum ICloudSync {
         .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Moves the finished staging folders to the recordings folder: into iCloud when syncing,
-    /// else to the local recordings folder (sync was turned off in the meantime).
-    static func flushStaging() async {
+    /// What `flushStaging` did: the folders that moved, and why the others could not (yet).
+    struct FlushResult {
+        var moved: [(from: URL, to: URL)] = []
+        /// One entry per folder that stays in the staging folder for now; nil = iCloud is not there.
+        var failed: [Error?] = []
+    }
+
+    /// Moves the finished staging folders to the recordings folder: into iCloud when syncing, to the
+    /// local recordings folder when sync is off (turned off in the meantime). With sync on but iCloud
+    /// not there (signed out, iCloud Drive off) or a move that fails (iCloud full), a folder stays in
+    /// the staging folder, where the library shows it (`Library.staging`), and is tried again later
+    /// (owner, 2026-11-09). Folders a job writes to (`isBusy`) wait. One flush at a time.
+    @MainActor static func flushStaging(isBusy: (URL) -> Bool = { _ in false }) async -> FlushResult {
+        var result = FlushResult()
+        guard !flushing else { return result }
+        flushing = true
+        defer { flushing = false }
         let target = OutputLocation.directory
-        let active = isActive
-        for folder in flushStagingPlan() {
-            _ = try? await Task.detached {
-                if active { return try publish(folder, into: target) }
-                let destination = target.appendingPathComponent(OutputLocation.uniqueName(folder.lastPathComponent, in: target))
-                try FileManager.default.moveItem(at: folder, to: destination)
-                return destination
-            }.value
+        let on = isOn, active = isActive
+        let plan = await Task.detached(priority: .utility) { flushStagingPlan() }.value
+        for folder in plan where !isBusy(folder) {
+            guard active || !on else {
+                result.failed.append(nil)
+                continue
+            }
+            do {
+                let destination = try await Task.detached(priority: .userInitiated) {
+                    try active ? publish(folder, into: target) : moveLocal(folder, into: target)
+                }.value
+                result.moved.append((folder, destination))
+            } catch {
+                NSLog("Bandje: a recording stays in the staging folder for now: \(error.localizedDescription)")
+                result.failed.append(error)
+            }
         }
+        return result
+    }
+    @MainActor private static var flushing = false
+
+    /// Why a recording is not in iCloud yet, in one calm sentence (`error`: what the move said; nil
+    /// when it was not tried because iCloud is not there).
+    static func pendingReason(_ error: Error?) -> String {
+        if FileManager.default.ubiquityIdentityToken == nil {
+            return tr("icloud.pending.noAccount", "Deze Mac is niet ingelogd bij iCloud.")
+        }
+        if container == nil {
+            return tr("icloud.pending.noDrive", "iCloud Drive staat uit voor Band·je op deze Mac.")
+        }
+        let ns = error.map { $0 as NSError }
+        if ns?.domain == NSCocoaErrorDomain, ns?.code == NSUbiquitousFileNotUploadedDueToQuotaError || ns?.code == NSFileWriteOutOfSpaceError {
+            return tr("icloud.pending.full", "Er is niet genoeg ruimte in iCloud.")
+        }
+        return tr("icloud.pending.unavailable", "iCloud Drive is nu niet bereikbaar.")
     }
 }
 

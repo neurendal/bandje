@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies Bandje for iOS's own code cannot use the network (CLAUDE.md, hard limit 1).
+# Verifies Bandje for iOS's own code cannot use the network.
 # Scans only our sources, not the SDK. The Desert Ant Labs SDK license check must keep working:
 # this script also FAILS if anything would block it (ATS keys, network filters).
 # Hard checks fail the run (exit 1). Warnings are reported only.
@@ -7,7 +7,7 @@ set -u
 
 cd "$(dirname "$0")/.."
 ALLOWED_DEP="desert-ant-core"
-SOURCES="Bandje ShareExtension Widgets Shared"
+SOURCES="Bandje ShareExtension Widgets Shared WatchShared BandjeWatch BandjeWatchWidgets"
 APP="build/DerivedData/Build/Products/Debug-iphonesimulator/Bandje.app"
 BIN="$APP/Bandje"
 RESOLVED="Bandje.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
@@ -39,14 +39,18 @@ fi
 
 echo "2/6 Package dependencies (project.yml)"
 pkgs=$(awk '/^packages:/{f=1;next} /^[a-z]/{f=0} f && /^  [A-Za-z0-9_-]+:/{gsub(/[ :]/,""); print}' project.yml)
-other=$(echo "$pkgs" | grep -vx "$ALLOWED_DEP" | grep -v '^$' || true)
+# The only other package: the shared BandjeKit, by local path ../bandje-core (checked below).
+other=$(echo "$pkgs" | grep -vxE "$ALLOWED_DEP|BandjeKit" | grep -v '^$' || true)
+if echo "$pkgs" | grep -qx BandjeKit && ! grep -A2 '^  BandjeKit:' project.yml | grep -qx '    path: \.\./bandje-core'; then
+  red "  BandjeKit must be the local package path: ../bandje-core"; fail=1
+fi
 if [ -n "$other" ]; then red "  Dependency other than $ALLOWED_DEP: $other"; fail=1; fi
 if grep -A3 "^  $ALLOWED_DEP:" project.yml | grep -q 'exactVersion: "4.2.3"'; then
   green "  $ALLOWED_DEP pinned exactVersion 4.2.3"
 else
   red "  $ALLOWED_DEP not pinned to exactVersion 4.2.3"; fail=1
 fi
-products=$(grep -E '^\s+product:' project.yml | awk '{print $2}' | sort -u | tr '\n' ' ')
+products=$(grep -E '^\s+product:' project.yml | awk '{print $2}' | grep -vx BandjeKit | sort -u | tr '\n' ' ')
 if echo "$products" | grep -qvxE '(Voz |Who |Voz Who )'; then
   red "  Products other than Voz and Who: $products"; fail=1
 else
@@ -62,6 +66,13 @@ if [ -f "$RESOLVED" ]; then
   fi
 else
   yellow "  $RESOLVED not found (run 'make resolve')"
+fi
+
+# BandjeKit (../bandje-core) is linked into the app: its own check (no URLs, no dependencies).
+if [ -x ../bandje-core/scripts/check-no-network.sh ]; then
+  ../bandje-core/scripts/check-no-network.sh | sed 's/^/  /' ; [ "${PIPESTATUS[0]}" -eq 0 ] || fail=1
+else
+  red "  ../bandje-core/scripts/check-no-network.sh not found (bandje-core must sit next to this repo)"; fail=1
 fi
 
 echo "3/6 App Transport Security / network filters (must not block the SDK license check)"
@@ -80,7 +91,7 @@ fi
 
 echo "4/6 Entitlements"
 ENT=$(codesign -d --entitlements - --xml "$APP" 2>/dev/null || true)
-# iCloud Drive (opt-in sync, CLAUDE.md hard limit 2) is allowed: only the one container and only
+# iCloud Drive (opt-in sync) is allowed: only the one container and only
 # CloudDocuments. CloudKit and key-value storage are not.
 if echo "$ENT" | grep -qE 'networkextension|CloudKit|ubiquity-kvstore'; then
   red "  Network extension, CloudKit or iCloud key-value entitlement present"; fail=1

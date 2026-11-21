@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import BandjeKit
 import SwiftUI
+
+/// What the detail screen's transcript load is keyed on: the file, and how many times it was
+/// written here (a transcript made again keeps its file name).
+struct TranscriptKey: Hashable {
+    let json: URL?
+    let generation: Int
+}
 
 /// A transcript read from disk, with its display layout computed once.
 struct LoadedTranscript: Equatable {
@@ -26,6 +34,12 @@ struct TranscriptBody: View {
     let matchIndex: Int
     /// How far the text is scrolled (the player folds when reading on).
     var onScroll: (CGFloat, CGFloat) -> Void = { _, _ in }
+    /// The recording's markers: a flag before their sentence, a row with the note under the turn.
+    var markers = Markers()
+    var onEditNote: (Double) -> Void = { _ in }
+    var onRemoveMarker: (Double) -> Void = { _ in }
+    /// "Copy All" in a turn's long-press menu: the whole transcript as plain text.
+    var onCopyTranscript: (() -> Void)? = nil
     let onSeek: (TimeInterval) -> Void
 
     nonisolated static let seekScheme = "bandje-seek"
@@ -39,9 +53,29 @@ struct TranscriptBody: View {
         }
     }
 
+    /// One turn as plain text, as in the shared text: "0:01 · Name" and its text on the next line.
+    nonisolated static func copyText(_ turn: TranscriptTurn, in transcript: Transcript) -> String {
+        let time = TranscriptWriter.shortClock(turn.start)
+        let head = turn.speaker.isEmpty ? time : "\(time) · \(transcript.name(of: turn.speaker))"
+        return head + "\n" + turn.sentences.map(\.text).joined(separator: " ")
+    }
+
+    /// Per turn: the markers per sentence index, and all markers of the turn in order.
+    nonisolated static func markerPlaces(_ markers: Markers, in turns: [TranscriptTurn]) -> [Int: (sentences: [Int: [Double]], all: [Double])] {
+        let flat = turns.flatMap { turn in turn.sentences.indices.map { (turn: turn.id, sentence: $0, start: turn.sentences[$0].start) } }
+        var out: [Int: (sentences: [Int: [Double]], all: [Double])] = [:]
+        for (i, times) in markers.placed(in: flat.map(\.start)).sorted(by: { $0.key < $1.key }) {
+            let place = flat[i]
+            out[place.turn, default: ([:], [])].sentences[place.sentence, default: []] += times
+            out[place.turn, default: ([:], [])].all += times
+        }
+        return out
+    }
+
     var body: some View {
         let active = TranscriptLayout.active(at: position, in: turns)
         let matches = Self.matches(in: turns, query: query)
+        let places = Self.markerPlaces(markers, in: turns)
         let current = matches.isEmpty ? nil : matches[min(max(0, matchIndex), matches.count - 1)]
         ScrollViewReader { proxy in
             ScrollView {
@@ -53,14 +87,29 @@ struct TranscriptBody: View {
                             .padding(.top, 24)
                     }
                     ForEach(turns) { turn in
-                        TurnView(turn: turn, dark: colorScheme == .dark,
-                                 name: turn.speaker.isEmpty || turn.continued ? "" : transcript.name(of: turn.speaker),
-                                 time: clock(turn.start),
-                                 activeSentence: active?.turn == turn.id ? active?.sentence : nil,
-                                 query: query,
-                                 currentMatch: current?.turn == turn.id ? current?.sentence : nil)
-                            .equatable()
-                            .id(turn.id)
+                        VStack(alignment: .leading, spacing: 6) {
+                            TurnView(turn: turn, dark: colorScheme == .dark,
+                                     name: turn.speaker.isEmpty || turn.continued ? "" : transcript.name(of: turn.speaker),
+                                     time: clock(turn.start),
+                                     activeSentence: active?.turn == turn.id ? active?.sentence : nil,
+                                     query: query,
+                                     currentMatch: current?.turn == turn.id ? current?.sentence : nil,
+                                     flags: places[turn.id]?.sentences ?? [:])
+                                .equatable()
+                                .contextMenu {
+                                    Button("Copy", systemImage: "doc.on.doc") {
+                                        UIPasteboard.general.string = Self.copyText(turn, in: transcript)
+                                    }
+                                    if let onCopyTranscript {
+                                        Button("Copy All", systemImage: "doc.on.doc", action: onCopyTranscript)
+                                    }
+                                }
+                            ForEach(places[turn.id]?.all ?? [], id: \.self) { time in
+                                MarkerRow(time: time, note: markers.note(at: time), onSeek: { onSeek(time) },
+                                          onEdit: { onEditNote(time) }, onRemove: { onRemoveMarker(time) })
+                            }
+                        }
+                        .id(turn.id)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -69,6 +118,11 @@ struct TranscriptBody: View {
             .reportsUserScroll(onScroll)
             .fadingTopEdge()
             .onAppear {
+                // Opened with a search (carried from the library): start at its first match.
+                if let turn = current?.turn {
+                    proxy.scrollTo(turn, anchor: UnitPoint(x: 0.5, y: 0.25))
+                    return
+                }
                 // Opened halfway (playing or paused there): start at the current sentence.
                 guard position > 0, query.isEmpty, let turn = active?.turn else { return }
                 proxy.scrollTo(turn, anchor: UnitPoint(x: 0.5, y: 0.25))
@@ -105,6 +159,8 @@ struct TurnView: View, Equatable {
     let activeSentence: Int?
     let query: String
     let currentMatch: Int?
+    /// Markers per sentence index: a red flag before that sentence (specs/markers.md 6).
+    var flags: [Int: [Double]] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -130,6 +186,10 @@ struct TurnView: View, Equatable {
         var text = AttributedString()
         let q = query.trimmingCharacters(in: .whitespaces)
         for (i, sentence) in turn.sentences.enumerated() {
+            if let times = flags[i] {
+                if !text.characters.isEmpty, text.characters.last != " " { text.append(AttributedString(" ")) }
+                text.append(AttributedString(String(repeating: "🚩", count: times.count) + "\u{00A0}"))
+            }
             var part = AttributedString(sentence.text)
             part.link = URL(string: "\(TranscriptBody.seekScheme):\(sentence.start)")
             if i == currentMatch {
@@ -184,7 +244,8 @@ struct TranscriptSearchBar: View {
             Button("Done", action: close)
         }
         .onChange(of: query) { _, _ in matchIndex = 0 }
-        .onAppear { focused = true }
+        // Empty: type right away. Prefilled from the library's search: read first, no keyboard.
+        .onAppear { focused = query.isEmpty }
     }
 
     private func next(_ step: Int) {
@@ -196,7 +257,10 @@ struct TranscriptSearchBar: View {
 /// No transcript yet: one button, whether to recognise speakers, one line about language.
 struct TranscribePrompt: View {
     let error: String?
+    /// False past the free transcriptions (specs/purchase.md): `start` then shows the paywall.
+    var mayTranscribe = true
     let start: (Bool) -> Void
+    var showPaywall: () -> Void = {}
     @AppStorage("detectSpeakers") private var detectSpeakers = true
 
     var body: some View {
@@ -217,6 +281,7 @@ struct TranscribePrompt: View {
             .buttonStyle(.glass)
             .controlSize(.large)
             .accessibilityIdentifier("transcribeButton")
+            FreeLine(mayTranscribe: mayTranscribe, showPaywall: showPaywall)
             Toggle("Recognise speakers", isOn: $detectSpeakers)
                 .tint(.green)
                 .padding(.horizontal, 16)
@@ -341,6 +406,8 @@ struct SummaryKey: Hashable {
 struct SummaryBody: View {
     let blocks: [Summaries.Block]
     var template: String? = nil
+    /// The whole body, for "Copy All" in each block's long-press menu (specs/share.md).
+    var copyText: String? = nil
     /// "Summarise again" under the summary, with a template of choice (empty: not offered).
     var templates: [Summaries.Template] = []
     var again: (Summaries.Template) -> Void = { _ in }
@@ -358,19 +425,29 @@ struct SummaryBody: View {
                         .accessibilityLabel(Text("Template \(template)"))
                 }
                 ForEach(blocks.indices, id: \.self) { i in
-                    switch blocks[i] {
-                    case .heading(let text):
-                        Text(Self.inline(text))
-                            .font(.headline)
-                            .padding(.top, i == 0 ? 0 : 12)
-                            .accessibilityAddTraits(.isHeader)
-                    case .bullet(let text):
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(verbatim: "•").foregroundStyle(.tint)
+                    Group {
+                        switch blocks[i] {
+                        case .heading(let text):
+                            Text(Self.inline(text))
+                                .font(.headline)
+                                .padding(.top, i == 0 ? 0 : 12)
+                                .accessibilityAddTraits(.isHeader)
+                        case .bullet(let text):
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(verbatim: "•").foregroundStyle(.tint)
+                                Text(Self.inline(text))
+                            }
+                        case .paragraph(let text):
                             Text(Self.inline(text))
                         }
-                    case .paragraph(let text):
-                        Text(Self.inline(text))
+                    }
+                    // Long press: copy this block, or the whole summary (no text selection: on the
+                    // iPhone it only takes whole blocks, and it would take the long press).
+                    .contextMenu {
+                        Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = Summaries.plainText(blocks[i]) }
+                        if let copyText {
+                            Button("Copy All", systemImage: "doc.on.doc") { UIPasteboard.general.string = copyText }
+                        }
                     }
                 }
                 Text("Made with Apple Intelligence on this \(Device.name).")
@@ -390,7 +467,6 @@ struct SummaryBody: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .textSelection(.enabled)
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
@@ -514,7 +590,7 @@ struct SpeakerNamingSheet: View {
     let recording: Recording
     let onSave: (Transcript) -> Void
     @Environment(\.dismiss) private var dismiss
-    @Environment(Player.self) private var player
+    @Environment(PlayerModel.self) private var player
     @Environment(Recorder.self) private var recorder
     @State private var rows: [Row] = []
     @State private var playing: String?
@@ -608,9 +684,7 @@ struct SpeakerNamingSheet: View {
     private func toggle(_ row: Row) {
         if playing == row.label { stopClip(); return }
         stopClip()
-        player.load(recording)
-        player.seek(to: max(0, row.start - 0.2))
-        player.play()
+        Playback.play(recording, at: max(0, row.start - 0.2))
         playing = row.label
         let length = min(row.end - row.start + 0.4, Self.clipSeconds)
         clipStop = Task {
@@ -623,13 +697,15 @@ struct SpeakerNamingSheet: View {
     private func stopClip() {
         clipStop?.cancel()
         clipStop = nil
-        if playing != nil { player.pause() }
+        if playing != nil { player.pause(reason: .user) }
         playing = nil
     }
 
     private func save() {
         stopClip()
-        var updated = transcript
+        // The file as it is now (it may have been transcribed again since the sheet opened): only
+        // the names change.
+        var updated = (try? TranscriptWriter.read(json: json)) ?? transcript
         var names: [String: String] = [:]
         for row in rows {
             let name = row.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -642,6 +718,40 @@ struct SpeakerNamingSheet: View {
             dismiss()
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+}
+
+/// A marker under its turn (or in the list without a transcript): the flag and time play from
+/// there, the note (or "Add a note…") edits it; a long press offers the note and removing it.
+struct MarkerRow: View {
+    let time: Double
+    let note: String?
+    let onSeek: () -> Void
+    let onEdit: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Button(action: onSeek) {
+                HStack(spacing: 4) {
+                    Image(systemName: "flag.fill").foregroundStyle(Color.accentColor)
+                    Text(clock(time)).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityLabel(Text("Play from the marker at \(clock(time))"))
+            Button(action: onEdit) {
+                Text(note ?? String(localized: "Add a note…"))
+                    .foregroundStyle(note == nil ? .tertiary : .primary)
+                    .multilineTextAlignment(.leading)
+            }
+            .accessibilityLabel(note.map { Text("Note: \($0)") } ?? Text("Add a note"))
+        }
+        .font(.footnote)
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Note…", systemImage: "square.and.pencil", action: onEdit)
+            Button("Remove marker", systemImage: "trash", role: .destructive, action: onRemove)
         }
     }
 }

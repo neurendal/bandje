@@ -1,0 +1,63 @@
+{
+  "identifier" : "6C1E2B7A",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : true,
+      "internalID" : "6C1E2B7A01",
+      "localizations" : [
+        {
+          "description" : "Transcribing and dictation without limit.",
+          "displayName" : "Band·je Unlimited",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Transcriberen en dicteren zonder limiet.",
+          "displayName" : "Band·je Onbeperkt",
+          "locale" : "nl"
+        }
+      ],
+      "productID" : "com.neurendal.bandje.unlimited",
+      "referenceName" : "Band·je Onbeperkt",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : true,
+      "internalID" : "6C1E2B7A02",
+      "localizations" : [
+        {
+          "description" : "Dictation without limit.",
+          "displayName" : "Band·je Dictation",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Dicteren zonder limiet.",
+          "displayName" : "Band·je Dicteren",
+          "locale" : "nl"
+        }
+      ],
+      "productID" : "com.neurendal.bandje.dictation",
+      "referenceName" : "Band·je Dicteren",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "nl",
+    "_storefront" : "NLD",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

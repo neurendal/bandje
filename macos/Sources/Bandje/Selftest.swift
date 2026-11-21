@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import BandjeKit
 import Carbon.HIToolbox
 import CoreAudio
 import Foundation
@@ -31,7 +32,19 @@ enum Selftest {
             if let look = value("--appearance") {
                 NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
             }
+            // `-purchaseState …`: the freemium screens (Settings' Band·je Onbeperkt tab, the paywall).
+            Store.start()
             switch which {
+            case "paywall", "paywall-dictation":
+                // The paywall on its own (no Band·je window), as from the menu bar or a dictation.
+                Paywall.show(which == "paywall" ? .transcribe : .dictation)
+                // Active, so the Buy button is drawn as the default button.
+                NSApp.activate(ignoringOtherApps: true)
+                Paywall.nsWindow?.makeKeyAndOrderFront(nil)
+                RunLoop.main.add(Timer(timeInterval: 3, repeats: false) { _ in
+                    MainActor.assumeIsolated { snapshot(which) }
+                }, forMode: .common)
+                return true
             case "about":
                 AboutWindow.show()
             case "menu":
@@ -48,6 +61,13 @@ enum Selftest {
                 // windows meanwhile (screencapture -l). The menu closes and the app quits after 6 s.
                 if let library = value("--library") { OutputLocation.snapshotDirectory = URL(fileURLWithPath: library, isDirectory: true) }
                 BandjeApp.snapshotDevices = (value("--mic") ?? "Microphone", value("--output") ?? "Speakers")
+                // `--cue <json>`: that recording in the player, so the menu shows its rows (paused,
+                // at `--seek`).
+                if let json = value("--cue").map({ URL(fileURLWithPath: $0) }),
+                   let item = Library.scan(json.deletingLastPathComponent().deletingLastPathComponent())
+                       .first(where: { $0.folder.standardizedFileURL == json.deletingLastPathComponent().standardizedFileURL })?.playable {
+                    Playback.player.cue(item, at: value("--seek").flatMap(Double.init))
+                }
                 let delegate = NSApp.delegate as? BandjeApp
                 delegate?.setUpForSnapshot()
                 if let json = value("--select") { delegate?.selectForSnapshot(URL(fileURLWithPath: json)) }
@@ -77,12 +97,14 @@ enum Selftest {
                     delegate?.openMenuForSnapshot()
                 }
                 return true
-            case "window", "naming", "rename", "welcome", "recorder":
+            case "window", "naming", "rename", "share", "welcome", "recorder":
                 // `--select <json>`: that recording; `--library <folder>`: the folder the library shows
                 // (default the selftest folder); `--window-size 1280x800`; `--seek <s>`: the player at
-                // that position, so its sentence lights up (website screenshots).
+                // that position, so its sentence lights up (website screenshots); `--cue <json>`:
+                // that recording in the player instead (the mini player).
                 let library = value("--library").map { URL(fileURLWithPath: $0, isDirectory: true) } ?? directory
                 Library.shared.root = { library }
+                Library.shared.staging = { nil }
                 Library.shared.isRootKnown = { true }
                 Task {
                     await Library.shared.refresh()
@@ -96,6 +118,8 @@ enum Selftest {
                             ?? URL(fileURLWithPath: arg)
                     } ?? Library.shared.recordings.first { $0.transcript != nil }?.transcript
                     Activity.shared.showsWelcome = which == "welcome"
+                    // `--welcome-step 2`: the welcome's Access step.
+                    Activity.shared.welcomeStep = value("--welcome-step").flatMap(Int.init) ?? 1
                     if which == "recorder" {
                         // The record screen as during a recording (nothing is recorded): 1:23 in, a steady level.
                         // `--recorded-at <ISO 8601>`: the moment in the default name (App Store screenshots).
@@ -110,10 +134,15 @@ enum Selftest {
                         MainWindow.nsWindow?.setContentSize(NSSize(width: size[0], height: size[1]))
                         MainWindow.nsWindow?.center()
                     }
-                    if let seek = value("--seek").flatMap(Double.init),
-                       let audio = Library.shared.recordings.first(where: { $0.transcript == pick })?.audio {
-                        try? await AudioPlayer.shared.load(audio)
-                        AudioPlayer.shared.seek(seek)
+                    if value("--cue") == nil, let seek = value("--seek").flatMap(Double.init),
+                       let item = Library.shared.recordings.first(where: { $0.transcript == pick })?.playable {
+                        Playback.player.cue(item, at: seek)  // paused there; nothing saved
+                    }
+                    // `--cue <json>`: another recording in the player, so the mini player shows
+                    // (specs/player.md 5.1); `--seek` is its position then.
+                    if let arg = value("--cue"),
+                       let item = Library.shared.recordings.first(where: { $0.transcript.map { same($0.path, URL(fileURLWithPath: arg).standardizedFileURL.path) } ?? false })?.playable {
+                        Playback.player.cue(item, at: value("--seek").flatMap(Double.init))
                     }
                     // Active, so the sidebar isn't drawn dimmed.
                     NSApp.activate(ignoringOtherApps: true)
@@ -125,6 +154,10 @@ enum Selftest {
                         // After the recording view is on screen.
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { NotificationCenter.default.post(name: .bandjeRename, object: nil) }
                     }
+                    // ⌘P: with summaries the "What do you want to share?" chooser (specs/share.md).
+                    if which == "share" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { NotificationCenter.default.post(name: .bandjePrint, object: nil) }
+                    }
                     // A timer in the common modes: it also fires while a sheet (Name Speakers) is up.
                     RunLoop.main.add(Timer(timeInterval: 3, repeats: false) { _ in
                         MainActor.assumeIsolated { snapshot(which) }
@@ -133,10 +166,15 @@ enum Selftest {
                 return true
             default:
                 // `--tab 0…5`: which settings tab.
-                SettingsWindow.show(apply: { _, _ in nil }, chooseFolder: { _ in false }, restart: {},
+                SettingsWindow.show(apply: { _, _, _ in nil }, chooseFolder: { _ in false }, restart: {},
                                     tab: value("--tab").flatMap(Int.init))
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { snapshot(which) }
+            return true
+        }
+        // `--selftest-gate <audio> -purchaseState …`: the freemium gates as the app runs them.
+        if let file = value("--selftest-gate") {
+            Task { await gate(URL(fileURLWithPath: file)) }
             return true
         }
         if CommandLine.arguments.contains("--selftest-set-input") {
@@ -240,6 +278,45 @@ enum Selftest {
         NSApp.terminate(nil)
     }
 
+    /// `--selftest-gate <audio>`: Transcribe in the window on a recording that was never transcribed,
+    /// then (only when the free minutes are used up, so the microphone is never touched) a dictation.
+    /// Reports whether each started and whether the paywall showed. A transcription that starts is
+    /// cut off by quitting (nothing is written before it finishes).
+    static func gate(_ audio: URL) async {
+        Store.start()
+        var result: [String: Any] = ["mode": "selftest-gate", "state": Store.override?.rawValue ?? "none", "storeActive": Store.isActive]
+        guard let app = NSApp.delegate as? BandjeApp else {
+            write(["mode": "selftest-gate", "errors": ["no app delegate"]], to: "last.json")
+            NSApp.terminate(nil)
+            return
+        }
+        result["mayTranscribe"] = Store.mayTranscribe(audio: audio)
+        result["transcriptionsLeft"] = Purchases.shared.transcriptionsLeft
+        result["freeTranscriptions"] = FreeAllowance.transcriptions
+        let transcription = await app.transcribeForSelftest(audio)
+        result["transcriptionStarted"] = transcription.started
+        result["transcribePaywall"] = transcription.paywall
+        Paywall.close(bought: false)
+        result["mayDictate"] = Store.mayDictate
+        if !Store.mayDictate {
+            let dictation = app.dictateForSelftest()
+            result["dictationStarted"] = dictation.started
+            result["dictationPaywall"] = dictation.paywall
+            Paywall.close(bought: false)
+        }
+        if Store.override == .free {
+            // The free dictation note (in memory: an override never saves): due once when a
+            // dictation passes 10 minutes used; the menu line while 5 or fewer are left.
+            result["fewDictationMinutesBefore"] = Store.fewDictationMinutesLeft ?? -1
+            result["dictationWarning"] = Store.noteDictated(20)
+            result["dictationWarningAgain"] = Store.noteDictated(1)
+            result["fewDictationMinutesAfter"] = Store.fewDictationMinutesLeft ?? -1
+        }
+        result["errors"] = [String]()
+        write(result, to: "last.json")
+        NSApp.terminate(nil)
+    }
+
     /// `--selftest-set-input`: switch the macOS default input to another device and back.
     static func setInput() {
         var result: [String: Any] = ["mode": "selftest-set-input", "lidClosed": Recorder.lidClosed()]
@@ -270,8 +347,8 @@ enum Selftest {
     }
 
     static func snapshot(_ name: String) {
-        // The Name Speakers sheet on its own; the Bandje window when it is open; else the visible window.
-        let sheet = ["naming", "rename"].contains(name) ? NSApp.windows.first(where: { $0.isSheet && $0.isVisible }) : nil
+        // The Name Speakers, Name and Colour or share chooser sheet on its own; the Bandje window when it is open; else the visible window.
+        let sheet = ["naming", "rename", "share"].contains(name) ? NSApp.windows.first(where: { $0.isSheet && $0.isVisible }) : nil
         guard let window = sheet ?? MainWindow.nsWindow.flatMap({ $0.isVisible ? $0 : nil })
                 ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
               let frameView = window.contentView?.superview,
@@ -292,7 +369,13 @@ enum Selftest {
         frameView.cacheDisplay(in: frameView.bounds, to: rep)
         let url = directory.appendingPathComponent("snapshot-\(name).png")
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
-        write(["mode": "selftest-snapshot", "file": url.path, "errors": [String]()], to: "last.json")
+        var info: [String: Any] = ["mode": "selftest-snapshot", "file": url.path, "errors": [String]()]
+        // The welcome's Free to Start section (with `-purchaseState`): free, dictationOwned, unlocked or none.
+        if name == "welcome" {
+            info["welcomeFree"] = Store.welcomeFree?.rawValue ?? "none"
+            info["welcomeStep"] = Activity.shared.welcomeStep
+        }
+        write(info, to: "last.json")
         // An open sheet (Name Speakers, Name and Colour) blocks quitting: close it first, unsaved.
         for w in NSApp.windows { if let s = w.attachedSheet { w.endSheet(s) } }
         NSApp.terminate(nil)

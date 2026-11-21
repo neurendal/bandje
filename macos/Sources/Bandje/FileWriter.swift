@@ -452,6 +452,47 @@ enum OutputLocation {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
+    /// Half files a crash, kill or power loss leaves behind, removed at launch when they are older than
+    /// `age` (nothing still being written is that old: a running conversion or export keeps touching
+    /// its file). In and one level below each of `recordingDirs`: `<name>.converting.m4a` (recording
+    /// conversion; it starts again from the `.caf`, which is never touched) and hidden
+    /// `.embedding-<id>.m4a` (a copy of the audio while its cover goes in). In `temp`: audio taken out
+    /// of an imported video (`bandje-import-`), the web page's compact audio (`compact-`), and the
+    /// copies and pages made for the share sheet (`Share/<id>`, `Bandje-share-<id>`).
+    /// Returns how many items were removed.
+    @discardableResult
+    static func removeLeftovers(recordingDirs: [URL], temp: URL, age: TimeInterval = 3600, now: Date = Date()) -> Int {
+        let fm = FileManager.default
+        let cutoff = now.addingTimeInterval(-age)
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .isDirectoryKey]
+        func old(_ url: URL) -> Bool {
+            guard let date = try? url.resourceValues(forKeys: Set(keys)).contentModificationDate else { return false }
+            return date < cutoff
+        }
+        func items(_ dir: URL) -> [URL] { (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys)) ?? [] }
+        func isDir(_ url: URL) -> Bool { (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+        var candidates: [URL] = []
+        for dir in recordingDirs {
+            let top = items(dir)
+            let files = top + top.filter { isDir($0) && !$0.lastPathComponent.hasPrefix(".") }.flatMap(items)
+            candidates += files.filter { file in
+                let name = file.lastPathComponent
+                return !isDir(file) && (name.hasSuffix(".converting.m4a") || (name.hasPrefix(".embedding-") && name.hasSuffix(".m4a")))
+            }
+        }
+        candidates += items(temp).filter { item in
+            let name = item.lastPathComponent
+            return (name.hasPrefix("bandje-import-") || name.hasPrefix("compact-")) && name.hasSuffix(".m4a") && !isDir(item)
+                || name.hasPrefix("Bandje-share-") && isDir(item)
+        }
+        candidates += items(temp.appendingPathComponent("Share", isDirectory: true)).filter(isDir)
+        var removed = 0
+        for item in candidates where old(item) {
+            if (try? fm.removeItem(at: item)) != nil { removed += 1 }
+        }
+        return removed
+    }
+
     /// Free space on the volume of `dir` (space the system can make available), nil if unknown.
     /// `dir` may not exist yet (a recording's folder is made when its file is written): then the
     /// nearest folder above it that does exist is asked.
@@ -471,14 +512,13 @@ enum OutputLocation {
         return plain
     }
 
-    /// `Transcribeer bestand…` gives the file its own folder `<dir>/<name>/` and copies the
-    /// audio into it, so transcript, player and audio sit together (the original stays where it was).
-    /// Returns the folder and the audio to transcribe: the copy, or the original when copying fails.
-    /// A new folder in `dir` for an imported file, named after it, with a copy of the audio.
-    /// Never reuses an existing folder (that would replace a recording or its transcript): when the
-    /// name is taken it becomes `<name>_2`, `_3`… Names Bandje uses itself (Templates, selftest) and
-    /// names starting with a dot (hidden, like `.models`) are avoided. A file that already lies in
-    /// its own folder in `dir` (transcribing an import again) is used as is.
+    /// `Transcribeer bestand…` gives the file its own new folder `<dir>/<name>/` with a copy of the
+    /// audio, so transcript, player and audio sit together (the original stays where it was).
+    /// Never reuses an existing folder (that would replace a recording or its transcript): a taken
+    /// name becomes `<name> 2`, `<name> 3`… (`uniqueName`). Names Bandje uses itself (`reserved`)
+    /// and leading dots (hidden, like `.models`) are avoided. A file that already lies in its own
+    /// folder in `dir` (transcribing an import again) is used as is. Returns the folder and the
+    /// audio to transcribe: the copy, or the original when copying fails.
     static func importFolder(for url: URL, in dir: URL) -> (folder: URL, audio: URL) {
         let fm = FileManager.default
         let parent = url.deletingLastPathComponent()
@@ -497,15 +537,57 @@ enum OutputLocation {
         return (folder, copy)
     }
 
+    /// After `importFolder` copied `original` to `copy` in `folder`: as on the iPhone, a video (or
+    /// audio AVFoundation can't read as a file) keeps only its sound, as `<name>.m4a`, and the folder
+    /// gets a `.bandje.json` marked `imported` (markers work, and it is never taken for one of our
+    /// stereo recordings). Returns the audio to transcribe. A file transcribed again in its own folder
+    /// (not a fresh copy) stays as it is.
+    static func prepareImport(folder: URL, copy: URL, original: URL) async throws -> URL {
+        let fm = FileManager.default
+        guard copy != original, copy.deletingLastPathComponent().standardizedFileURL == folder.standardizedFileURL else { return copy }
+        let asset = AVURLAsset(url: copy)
+        guard !((try? await asset.loadTracks(withMediaType: .audio)) ?? []).isEmpty else {
+            throw TranscriberError(message: tr("import.notAudio", "%@ is geen audio- of videobestand dat Band·je kan openen.", original.lastPathComponent))
+        }
+        let hasVideo = !((try? await asset.loadTracks(withMediaType: .video)) ?? []).isEmpty
+        var audio = copy
+        if hasVideo || (try? AVAudioFile(forReading: copy)) == nil {
+            let target = folder.appendingPathComponent(folder.lastPathComponent + ".m4a")
+            let temp = fm.temporaryDirectory.appendingPathComponent("bandje-import-\(UUID().uuidString).m4a")
+            defer { try? fm.removeItem(at: temp) }
+            do {
+                guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                    throw CocoaError(.featureUnsupported)
+                }
+                try await session.export(to: temp, as: .m4a)
+                guard let file = try? AVAudioFile(forReading: temp), file.length > 0 else { throw CocoaError(.fileReadCorruptFile) }
+            } catch {
+                throw TranscriberError(message: tr("import.convertFailed", "Band·je kan de audio in %@ niet omzetten.", original.lastPathComponent))
+            }
+            try fm.removeItem(at: copy)
+            if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+            try fm.moveItem(at: temp, to: target)
+            audio = target
+        }
+        if RecordingMeta.read(from: folder) == nil {
+            let created = (try? await asset.load(.creationDate)).flatMap { $0 }
+            let date: Date? = if let created { try? await created.load(.dateValue) } else { nil }
+            let fileDate = (try? original.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+            var meta = RecordingMeta(created: date ?? fileDate ?? Date())
+            meta.imported = true
+            if let seconds = Library.audioDuration(audio) { meta.setDuration(seconds) }
+            try meta.write(to: folder)
+        }
+        return audio
+    }
+
     /// The Bandje logo in the app bundle (nil in unit tests).
     static var bundledLogo: URL? { Bundle.main.url(forResource: "Logo", withExtension: "png") }
 
 
     /// `mm:ss` below an hour, `h:mm:ss` from an hour on.
     static func elapsedString(_ seconds: TimeInterval) -> String {
-        let s = max(0, Int(seconds))
-        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
-                         : String(format: "%02d:%02d", s / 60, s % 60)
+        TranscriptWriter.clock(seconds, long: seconds >= 3600)
     }
 
     /// Folder names that are not recordings (also on the iPhone): compared case-insensitively.
@@ -558,10 +640,12 @@ enum OutputLocation {
         return folder.appendingPathComponent("\(name).caf")
     }
 
-    /// The recording in `folder` is finished: `recording` goes off in `.bandje.json`.
+    /// The recording in `folder` is finished: `recording` goes off in `.bandje.json`, and its
+    /// length goes in (read from the audio; the iPhone shows it while the audio is still in iCloud).
     static func finishMeta(_ folder: URL) {
         guard var meta = RecordingMeta.read(from: folder) else { return }
         meta.recording = nil
+        if let audio = Library.audioFile(in: folder), let seconds = Library.audioDuration(audio) { meta.setDuration(seconds) }
         try? meta.write(to: folder)
     }
 
@@ -570,7 +654,7 @@ enum OutputLocation {
     /// A recording from the iPhone is mono; an imported file goes through Transcribe File… as mode C.
     static func isOwnRecording(_ audio: URL) -> Bool {
         if TranscriptWriter.isRecordingName(audio.deletingPathExtension().lastPathComponent) { return true }
-        guard RecordingMeta.read(from: audio.deletingLastPathComponent()) != nil,
+        guard let meta = RecordingMeta.read(from: audio.deletingLastPathComponent()), meta.imported != true,
               let file = try? AVAudioFile(forReading: audio) else { return false }
         return file.fileFormat.channelCount == 2
     }

@@ -13,11 +13,21 @@ die() { echo "error: $*" >&2; exit 1; }
 
 [ -z "$(git status --porcelain -- Bandje Shared Widgets ShareExtension project.yml models.lock.json)" ] \
   || die "Uncommitted changes. Commit first."
+CORE="$PWD/../bandje-core"
+[ -d "$CORE/.git" ] || die "../bandje-core not found (the shared package BandjeKit, next to this repo)"
+[ -z "$(git -C "$CORE" status --porcelain)" ] || die "Uncommitted changes in ../bandje-core. Commit first."
 
 # The build number only has to rise with every upload; a timestamp always does (as on the Mac).
 BUILD="$(date +%Y%m%d.%H%M)"
 VERSION="$(grep -m1 'MARKETING_VERSION' project.yml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
 COMMIT="$(git rev-parse --short HEAD)"
+CORE_COMMIT="$(git -C "$CORE" rev-parse --short HEAD)"
+# The public repo has one bandje-core for both apps (owner, 2026-11-08): say so early when the other
+# app's last upload was built with a different core (publishing then needs a new build of both).
+OTHER_CORE="$(git -C "$CORE" for-each-ref --sort=-creatordate --count=1 --format='%(refname:short)' 'refs/tags/build/*')"
+if [ -n "$OTHER_CORE" ] && ! git -C "$CORE" diff --quiet "$OTHER_CORE" HEAD; then
+  printf '\033[33m! bandje-core changed since the last macOS upload (%s). To publish the source, macOS needs a build with this core too (publish.sh both).\033[0m\n' "$OTHER_CORE"
+fi
 OUT="$PWD/build/appstore/$BUILD"
 mkdir -p "$OUT"
 
@@ -25,7 +35,7 @@ say "Checks"
 ./scripts/check-no-network.sh >/dev/null || die "check-no-network fails, no build."
 python3 scripts/verify-and-copy-models.py verify "$HOME/Music/Bandje/.models" >/dev/null || die "models source incomplete"
 
-say "Archive $VERSION ($BUILD), commit $COMMIT"
+say "Archive $VERSION ($BUILD), commit $COMMIT, bandje-core $CORE_COMMIT"
 xcodegen generate --quiet
 xcodebuild archive -quiet \
   -project Bandje.xcodeproj -scheme Bandje -configuration Release \
@@ -63,6 +73,8 @@ xcodebuild -exportArchive -archivePath "$OUT/Bandje.xcarchive" -exportOptionsPli
 
 if [ $UPLOAD = 1 ]; then
   git tag "ios-build/$BUILD" "$COMMIT" 2>/dev/null || true
+  # The same tag on bandje-core: the export publishes BandjeKit as it was in this build (GPL source).
+  git -C "$CORE" tag "ios-build/$BUILD" "$CORE_COMMIT" 2>/dev/null || true
   say "Uploaded: Band·je $VERSION ($BUILD), commit $COMMIT. App Store Connect processes it in 5-30 minutes."
 else
   say "Exported: $OUT/export (Band·je $VERSION ($BUILD), commit $COMMIT). Upload with --upload or Transporter."

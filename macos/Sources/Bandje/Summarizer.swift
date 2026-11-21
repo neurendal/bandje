@@ -15,13 +15,40 @@ enum Summaries {
     /// One source of truth: `iCloud Drive › Band·je › Templates` while syncing (the iPhone reads the same
     /// folder), else `~/Music/Bandje/Templates` (also when recordings go to another folder).
     static var folder: URL {
+        #if DEBUG
+        if let selftestFolder { return selftestFolder }
+        #endif
         if ICloudSync.isActive, let documents = ICloudSync.documents {
             return documents.appendingPathComponent("Templates", isDirectory: true)
         }
         return localFolder
     }
 
-    static var localFolder: URL { OutputLocation.defaultDirectory.appendingPathComponent("Templates", isDirectory: true) }
+    static var localFolder: URL {
+        #if DEBUG
+        if let selftestFolder { return selftestFolder }
+        #endif
+        return OutputLocation.defaultDirectory.appendingPathComponent("Templates", isDirectory: true)
+    }
+
+    #if DEBUG
+    /// Selftest, snapshot and screenshot runs (`--selftest-…`, often in another app language) never
+    /// touch the user's templates: they use `<--library>/Templates` (a screenshot library per
+    /// language) or `~/Music/Bandje/selftest/templates`.
+    static var selftestFolder: URL? {
+        guard CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest") }) else { return nil }
+        return OutputLocation.snapshotDirectory?.appendingPathComponent("Templates", isDirectory: true)
+            ?? OutputLocation.defaultDirectory.appendingPathComponent("selftest/templates", isDirectory: true)
+    }
+    #endif
+
+    /// Where the `templateAdded.<name>` flags live; a selftest run (DEBUG) keeps its own.
+    static var flagDefaults: UserDefaults {
+        #if DEBUG
+        if selftestFolder != nil, let scratch = UserDefaults(suiteName: "com.neurendal.bandje.selftest-templates") { return scratch }
+        #endif
+        return .standard
+    }
 
     /// Copies the `.md`/`.txt` templates from `source` into `target` (created when missing); a name
     /// that exists in `target` is kept unless `overwrite`. Turning sync on merges the local templates
@@ -55,23 +82,39 @@ enum Summaries {
     }
 
     /// Creates `folder` with the examples when it does not exist yet; an existing folder (also an
-    /// empty one) is the user's: it only gets an example added later (`laterExamples`), once, as on
-    /// the iPhone: never over a file of that name, and a flag per name so a deleted one stays gone.
-    /// Through iCloud the first app to add it shares it with the other.
+    /// empty one) is the user's: it only gets the later example (`laterExamples`) once, in one
+    /// language, as on the iPhone: never over a file of that name, not when the folder already has
+    /// that example in any language, and never again after that (one flag per language's name, all
+    /// set at once, so another app language or a deleted file adds nothing). Through iCloud the first
+    /// app to add it shares it with the other.
     static func seedIfMissing(_ folder: URL = folder, language: String = TranscriptWriter.appLocale.language.languageCode?.identifier ?? "nl",
-                              defaults: UserDefaults = .standard) {
+                              defaults: UserDefaults = flagDefaults) {
         let examples = examples(language: language)
+        let flags = laterExamples.map { "templateAdded." + $0 }
         if !FileManager.default.fileExists(atPath: folder.path) {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for t in examples {
                 try? Data(t.text.utf8).write(to: folder.appendingPathComponent(t.name + ".md"), options: .withoutOverwriting)
             }
-            for name in laterExamples { defaults.set(true, forKey: "templateAdded." + name) }
+            for key in flags { defaults.set(true, forKey: key) }
             return
         }
-        for t in examples where laterExamples.contains(t.name) && !defaults.bool(forKey: "templateAdded." + t.name) {
+        guard !flags.contains(where: { defaults.bool(forKey: $0) }) else { return }
+        if !containsLaterExample(folder), let t = examples.first(where: { laterExamples.contains($0.name) }) {
             try? Data(t.text.utf8).write(to: folder.appendingPathComponent(t.name + ".md"), options: .withoutOverwriting)
-            defaults.set(true, forKey: "templateAdded." + t.name)
+        }
+        for key in flags { defaults.set(true, forKey: key) }
+    }
+
+    /// True when `folder` has a later example in any language (`.md`/`.txt`, also an iCloud
+    /// placeholder of one that is not downloaded yet).
+    static func containsLaterExample(_ folder: URL) -> Bool {
+        let names = Set(((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).map { $0.lowercased() })
+        return laterExamples.contains { name in
+            ["md", "txt"].contains { ext in
+                let file = (name + "." + ext).lowercased()
+                return names.contains(file) || names.contains("." + file + ".icloud")
+            }
         }
     }
 
@@ -312,12 +355,15 @@ enum OnDeviceSummarizer {
         let context = SystemLanguageModel.default.contextSize
         // Room for the instructions (±500 tokens with a long template) and the answer (±1000).
         var budget = max(800, context - 1600)
-        for attempt in 0..<3 {
+        let attempts = 3
+        for attempt in 1...attempts {
             do {
                 return try await run(lines, template: template, language: language, budget: budget, progress: progress)
             } catch let error as LanguageModelSession.GenerationError {
-                if case .exceededContextWindowSize = error, attempt < 2 { budget = budget * 2 / 3; continue }
-                throw TranscriberError(message: describe(error))
+                guard case .exceededContextWindowSize = error else { throw TranscriberError(message: describe(error)) }
+                // Still too long with the smallest parts: say so (not the model's generic message).
+                guard attempt < attempts else { break }
+                budget = budget * 2 / 3
             }
         }
         throw TranscriberError(message: tr("summary.tooLong", "Dit gesprek is te lang om samen te vatten."))

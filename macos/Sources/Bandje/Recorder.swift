@@ -1,4 +1,5 @@
 import AudioToolbox
+import BandjeKit
 import CoreAudio
 import Foundation
 import IOKit.pwr_mgt
@@ -61,6 +62,41 @@ struct RecorderError: LocalizedError {
 
     static func coreAudio(_ what: String, _ status: OSStatus) -> RecorderError {
         RecorderError(message: tr("error.coreAudio", "%1$@ mislukt (fout %2$@).", what, "\(status)"))
+    }
+}
+
+/// Why a running recording stops by itself (owner, 2026-11-09). It always stops through the
+/// normal stop path, so what was recorded is converted and kept.
+enum AutoStop: Equatable {
+    /// Writing the file failed (e.g. the disk is full).
+    case writeFailed(OSStatus)
+    /// Less than the floor free on the recording's disk (`DiskSpace`).
+    case diskFull(freeBytes: Int64)
+    /// The recording reached `maxDuration`.
+    case tooLong
+
+    /// The longest recording: it stops after 12 hours (the message says "12").
+    static let maxDuration: TimeInterval = 12 * 3600
+
+    /// The reason to stop now, nil to go on. `freeBytes` is the last measured free space (nil:
+    /// unknown, never a reason to stop); `elapsed` the time since the recording started.
+    static func check(writeError: OSStatus, freeBytes: Int64?, floor: Int64 = Recorder.minFreeBytesWhileRecording,
+                      elapsed: TimeInterval) -> AutoStop? {
+        if writeError != noErr { return .writeFailed(writeError) }
+        if Recorder.diskLevel(freeBytes, floor: floor) == .tooLow, let freeBytes { return .diskFull(freeBytes: freeBytes) }
+        if elapsed >= maxDuration { return .tooLong }
+        return nil
+    }
+
+    var message: String {
+        switch self {
+        case .writeFailed(let status):
+            tr("error.writeFailed", "Schrijven naar het opnamebestand mislukt (fout %@). De opname is gestopt; wat tot nu toe is opgenomen, blijft bewaard.", "\(status)")
+        case .diskFull(let free):
+            tr("error.diskFull", "De schijf is bijna vol (nog %@ MB vrij). De opname is gestopt; wat tot nu toe is opgenomen, blijft bewaard.", "\(free / 1_000_000)")
+        case .tooLong:
+            tr("error.tooLong", "De opname is na 12 uur gestopt, de langste opname die Band·je maakt. Wat is opgenomen, blijft bewaard. Start een nieuwe opname om verder op te nemen.")
+        }
     }
 }
 
@@ -130,10 +166,11 @@ final class Recorder {
     /// Called on the main thread when a rebuild failed; the recording must then be stopped.
     var onFailure: ((String) -> Void)?
 
-    /// Recording does not start with less free space than this.
-    static var minFreeBytesToStart: Int64 = 500_000_000 // about 20 minutes of float32 stereo
+    /// Recording does not start with less free space than this (`DiskSpace`, the same on the iPhone;
+    /// a recording uses about 25 MB a minute). Selftests raise it to simulate a full disk.
+    static var minFreeBytesToStart: Int64 = DiskSpace.recordingFloor
     /// A running recording stops below this, so the file and its conversion stay intact.
-    static var minFreeBytesWhileRecording: Int64 = 200_000_000
+    static var minFreeBytesWhileRecording: Int64 = DiskSpace.recordingFloor
 
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
@@ -170,11 +207,13 @@ final class Recorder {
 
     var droppedSamples: Int { ring.dropped.load(ordering: .relaxed) }
     var framesWritten: Int { writer?.framesWritten ?? 0 }
+    /// Last write error of the file (noErr if none), e.g. when the disk is full.
+    var writeError: OSStatus { writer?.writeError ?? noErr }
 
     func start() throws {
         let dir = url.deletingLastPathComponent()
-        if let free = OutputLocation.freeBytes(at: dir, enough: Self.minFreeBytesToStart), free < Self.minFreeBytesToStart {
-            throw RecorderError(message: tr("error.diskStart", "Te weinig schijfruimte: nog %@ MB vrij. Een opname gebruikt ongeveer 25 MB per minuut. Maak ruimte vrij en probeer opnieuw.", "\(free / 1_000_000)"))
+        if let problem = Self.startProblem(freeBytes: OutputLocation.freeBytes(at: dir, enough: Self.minFreeBytesToStart)) {
+            throw RecorderError(message: problem)
         }
         do {
             try createTap()
@@ -189,20 +228,25 @@ final class Recorder {
             try startIO()
         } catch {
             stop()
-            // Nothing was recorded; an empty .caf would show up as "unfinished recording" at the next launch.
-            if writer != nil {
-                try? FileManager.default.removeItem(at: url)
-                let folder = url.deletingLastPathComponent()
-                if (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.isEmpty == true {
-                    try? FileManager.default.removeItem(at: folder) // the recording's own, now empty folder
-                }
-            }
             writer = nil
+            Self.removeUnstarted(url)
             throw error
         }
         preventSleep()
         listenForInputChanges()
         startDate = Date()
+    }
+
+    /// Nothing was recorded: removes the (empty) `.caf`, and the recording's own folder when nothing
+    /// but its `.bandje.json` (`recording: true`) is left. Otherwise both would show up as an
+    /// "unfinished recording" at the next launch.
+    static func removeUnstarted(_ caf: URL) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: caf)
+        let folder = caf.deletingLastPathComponent()
+        guard let rest = try? fm.contentsOfDirectory(atPath: folder.path),
+              rest.allSatisfy({ $0 == RecordingMeta.fileName || $0 == ".DS_Store" }) else { return }
+        try? fm.removeItem(at: folder)
     }
 
     /// Stops IO, destroys all Core Audio objects and closes the file. Safe to call repeatedly.
@@ -217,15 +261,33 @@ final class Recorder {
         allowSleep()
     }
 
-    /// Message when the recording must stop: write error or (almost) full disk.
+    /// Message when the recording must stop now (selftest; the app checks the disk off the main
+    /// thread every `DiskSpace.checkInterval` and calls `AutoStop.check` itself).
     func healthProblem() -> String? {
-        if let status = writer?.writeError, status != noErr {
-            return tr("error.writeFailed", "Schrijven naar het opnamebestand mislukt (fout %@). De opname is gestopt; wat tot nu toe is opgenomen, blijft bewaard.", "\(status)")
-        }
-        if let free = OutputLocation.freeBytes(at: url.deletingLastPathComponent(), enough: Self.minFreeBytesWhileRecording), free < Self.minFreeBytesWhileRecording {
-            return tr("error.diskFull", "De schijf is bijna vol (nog %@ MB vrij). De opname is gestopt; wat tot nu toe is opgenomen, blijft bewaard.", "\(free / 1_000_000)")
-        }
-        return nil
+        let free = OutputLocation.freeBytes(at: url.deletingLastPathComponent(), enough: Self.minFreeBytesWhileRecording)
+        let elapsed = startDate.map { Date().timeIntervalSince($0) } ?? 0
+        return AutoStop.check(writeError: writeError, freeBytes: free, elapsed: elapsed)?.message
+    }
+
+    /// Free space where `folder` is (it may not exist yet), for the checks below. Quick while there
+    /// is more than `DiskSpace.warningLevel`; can be slow on a nearly full disk, so call it off the
+    /// main thread while recording.
+    static func freeBytes(for folder: URL) -> Int64? {
+        OutputLocation.freeBytes(at: folder, enough: DiskSpace.warningLevel)
+    }
+
+    /// The disk level for `freeBytes` (`DiskSpace`), with `floor` as the lowest allowed (selftests
+    /// raise it). Unknown is `.ok`: never refuse or stop a recording on a failed read.
+    static func diskLevel(_ freeBytes: Int64?, floor: Int64) -> DiskSpace.Level {
+        guard let freeBytes else { return .ok }
+        return freeBytes < floor ? .tooLow : DiskSpace.level(freeBytes)
+    }
+
+    /// The message when a recording may not start with `freeBytes` free, nil when it may.
+    static func startProblem(freeBytes: Int64?, floor: Int64 = minFreeBytesToStart) -> String? {
+        guard diskLevel(freeBytes, floor: floor) == .tooLow, let freeBytes else { return nil }
+        return tr("error.diskStart", "Te weinig schijfruimte om op te nemen: nog %1$@ MB vrij, Band·je heeft minstens %2$@ MB nodig. Maak ruimte vrij en probeer opnieuw.",
+                  "\(freeBytes / 1_000_000)", "\(max(floor, DiskSpace.recordingFloor) / 1_000_000)")
     }
 
     /// Rebuilds aggregate and IOProc with the current default input device. The tap, ring

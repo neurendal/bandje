@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AVFoundation
+import BandjeKit
 import Foundation
 import Testing
 @testable import Bandje
@@ -16,17 +17,22 @@ struct PlayerTests {
         return Recording(folder: dir, audio: audio, date: .now, duration: 30, markers: [])
     }
 
+    /// A player of its own (silent, positions in a throwaway suite), as the app's (BandjeKit).
+    private func makePlayer() -> (PlayerModel, AVAudioPlayerEngine) {
+        let engine = AVAudioPlayerEngine()
+        engine.volume = 0
+        let defaults = UserDefaults(suiteName: "bandje-tests-\(UUID().uuidString)")!
+        return (PlayerModel(engine: engine, store: PlaybackPositionStore(defaults: defaults)), engine)
+    }
+
     private func advance(rate: Float, after seconds: Double) async throws -> Double {
         let recording = try copy()
-        let player = Player.shared
-        player.volume = 0
-        player.unload()
-        player.load(recording)
-        player.setRate(rate)
-        player.play()
+        let (player, _) = makePlayer()
+        player.rate = rate
+        await player.play(try #require(recording.playable), at: 0).value
         try await Task.sleep(for: .seconds(seconds))
-        player.pause()
-        defer { player.setRate(1); player.unload() }
+        player.pause(reason: .user)
+        defer { player.stop() }
         return player.currentTime
     }
 
@@ -37,21 +43,18 @@ struct PlayerTests {
         #expect(double > normal * 1.6)
     }
 
+    /// P14: a new speed applies at once.
     @Test func changingSpeedWhilePlaying() async throws {
         let recording = try copy()
-        let player = Player.shared
-        player.volume = 0
-        player.unload()
-        player.load(recording)
-        player.play()
+        let (player, _) = makePlayer()
+        await player.play(try #require(recording.playable), at: 0).value
         try await Task.sleep(for: .seconds(1))
         let start = player.currentTime
-        player.setRate(2)
+        player.rate = 2
         try await Task.sleep(for: .seconds(2))
-        player.pause()
+        player.pause(reason: .user)
         let advanced = player.currentTime - start
-        player.setRate(1)
-        player.unload()
+        player.stop()
         #expect(advanced > 3.2)
     }
 

@@ -8,7 +8,8 @@ Band·je neemt twee dingen tegelijk op: je microfoon en al het geluid dat je Mac
 
 - Tijdens de opname wordt het bandje in de menubalk rood, draaien de spoelen en loopt de tijd ernaast in rood.
 - Je Mac gaat niet slapen zolang Band·je opneemt.
-- De eerste keer vraagt macOS of Band·je het geluid van je Mac mag opnemen. Sta dat toe, anders hoort Band·je alleen je microfoon.
+- Iets belangrijks gehoord? Druk op ⌃⌥⌘M om dat moment te markeren, zie [Markers](#player).
+- macOS vraagt of Band·je het geluid van je Mac mag opnemen als je in het welkom of onder Instellingen › Toegang op **Sta toe…** klikt, anders bij de eerste opname. Sta dat toe, anders hoort Band·je alleen je microfoon. Bij het begin van elke opname controleert Band·je het, onhoorbaar, en waarschuwt meteen als het uit staat.
 - Blijft je microfoon zes seconden stil, of is de klep dicht terwijl de ingebouwde microfoon aan staat, dan waarschuwt Band·je en biedt het aan een andere microfoon te kiezen.
 
 Laat de anderen weten dat je opneemt. In sommige landen, en bij zakelijk gebruik, is dat wettelijk verplicht, en soms heb je ook hun toestemming nodig. Je bent zelf verantwoordelijk voor het naleven van de wet die voor jou geldt. Band·je herinnert je daar één keer aan, voor je eerste opname.
@@ -36,7 +37,7 @@ In het menu zie je de voortgang. Tijdens het transcriberen kun je gewoon een nie
 Draag tijdens een gesprek bij voorkeur een koptelefoon. Zonder koptelefoon vangt je microfoon ook de andere kant uit je speakers op. Band·je filtert het meeste daarvan weg, maar niet alles.
 
 ### Een ander bestand transcriberen
-Kies **Transcribeer bestand…** om elk audiobestand te transcriberen, zoals een memo van je iPhone. Band·je kopieert de audio naar een eigen map in je opnamemap en zet het transcript ernaast. Het origineel blijft waar het stond.
+Kies **Transcribeer bestand…** om elk audio- of videobestand te transcriberen, zoals een memo van je iPhone of een opgeslagen videogesprek. Band·je kopieert het naar een eigen map in je opnamemap en zet het transcript ernaast; van een video bewaart het alleen het geluid. Het origineel blijft waar het stond. Je kunt er [markeringen](#player) in zetten, net als in je eigen opnames.
 
 ## Sprekers benoemen {#speakers}
 Geef de sprekers in een transcript hun echte naam.
@@ -50,33 +51,41 @@ Op een telefoonlijn met een keuzemenu of wachtmuziek hoort Band·je soms meer sp
 ## Het Band·je-venster {#player}
 Al je opnames in één venster: luisteren, meelezen, zoeken, sprekers benoemen, samenvatten en delen.
 
-Kies **Open Band·je** in het menu (⌘O). Het venster opent ook als je Band·je zelf start, bijvoorbeeld vanuit Launchpad of Spotlight. **Open in Band·je** opent de huidige opname. Zolang het venster open is, staat Band·je in het Dock en in ⌘Tab; sluit je het, dan staat Band·je weer alleen in de menubalk. Zet **Altijd in het Dock** aan bij [Instellingen](#settings) om het icoon te houden. De eerste keer opent het venster altijd, met de toestemmingen, elk met een eigen knop. Sluit je het venster, dan blijft Band·je in de menubalk; stop Band·je via dat menu.
+Kies **Open Band·je** in het menu (⌘O). Het venster opent ook als je Band·je zelf start, bijvoorbeeld vanuit Launchpad of Spotlight. **Open in Band·je** opent de huidige opname. Zolang het venster open is, staat Band·je in het Dock en in ⌘Tab; sluit je het, dan staat Band·je weer alleen in de menubalk. Zet **Altijd in het Dock** aan bij [Instellingen](#settings) om het icoon te houden. De eerste keer opent het venster altijd met een welkom in twee stappen: eerst de sneltoetsen, met **Volgende** naar de toestemmingen, elk met een eigen knop. Sluit je het venster, dan blijft Band·je in de menubalk; stop Band·je via dat menu.
 
 - Links: je opnames per dag, met de tijd, de lengte en de eerste woorden van het transcript. Zoeken vindt titels en woorden in transcripten. Onderaan staat **Start opname**; tijdens het opnemen staat de nieuwe opname bovenaan met een rode stip, en na het stoppen opent het venster hem.
-- Rechts: de opname met het cassettebandje, de positiebalk en de afspeelknop (spatiebalk). Klik op een zin om vanaf daar te luisteren; tijdens het afspelen licht de zin op die je hoort en loopt het transcript mee. **Zoek in transcript** (⌘F) vindt woorden.
+- Rechts: de opname met het cassettebandje, de positiebalk en de afspeelknop (spatiebalk). Klik op een zin om vanaf daar te luisteren; tijdens het afspelen licht de zin op die je hoort en loopt het transcript mee. ⌘← en ⌘→ springen 15 seconden terug en vooruit. **Zoek in transcript** (⌘F) vindt woorden.
+- Elke opname onthoudt waar je gebleven was, ook na een herstart; de snelheid geldt voor alle opnames. Er speelt alleen de opname die je ziet: open je een andere opname of sluit je het venster, dan stopt het afspelen. Begin je met opnemen of dicteren, dan pauzeert het. Stop je een opname, dan opent het venster met de nieuwe opname; kies je in het menu **Transcribeer bestand…** of een template bij **Samenvatten**, dan opent het venster met die opname en zie je daar de voortgang.
 - Naast **Transcript** staat het tabblad **Samenvatting**. Is er nog geen samenvatting, dan staat daar **Vat samen**; kies een template, zie [Samenvatten](#summaries). Elke samenvatting krijgt een eigen tabblad; **Nog een samenvatting** maakt er nog een.
 - Nog geen transcript (bijvoorbeeld een opname van je iPhone)? Klik op **Transcribeer**.
-- **Deel**: **Audio…**, **Transcript (.md)…**, **Transcript als pdf…** of **Webpagina met audio…**: één bestand met de speler, het transcript, de samenvattingen en de audio, dat in elke browser werkt, ook offline. **Webpagina met audio, compact (voor mail)…** maakt de audio kleiner. De pagina heeft een link naar band.je en verder niets.
-- Op papier: **Druk af…** (⌘P, of in **Deel**) drukt het transcript af, net als de pdf.
+- **Deel**: **Audio…** en **Audiopagina…** delen de opname. **Deel als…**, **Kopieer als…** en **Bewaar als…** vragen eerst **PDF**, **Tekst** of **Markdown** en zijn één document: eerst de samenvattingen, dan het transcript. Zijn er samenvattingen, dan vink je daar ook aan wat erin komt (alles staat aangevinkt). **Bewaar als…** bewaart het waar je wilt, **Kopieer als…** zet het op het klembord. **Audiopagina…** is één bestand met de speler, het transcript, de samenvattingen en de audio, dat in elke browser werkt, ook offline. **Audiopagina, compact (voor mail)…** maakt de audio kleiner. De pagina heeft een link naar band.je en verder niets.
+- Op papier: **Druk af…** (⌘P) of **Afdrukken…** in **Deel** drukt hetzelfde document af als de pdf.
+- Kopiëren: **Kopieer** naast een samenvatting zet de tekst op het klembord. Je kunt ook tekst selecteren en op ⌘C drukken.
 - **Meer**: **Naam en kleur…** (of klik op de titel op het cassettebandje): de naam en de kleur van het bandje, **Benoem sprekers…**, **Toon in Finder**, **Verwijder…** (naar de prullenmand).
 - Een opname weggooien kan ook in de lijst: klik met de rechtermuisknop op de opname en kies **Verwijder…**, of selecteer hem en druk op ⌫. Band·je vraagt het eerst.
 
+### Markers
+Een marker is een vlaggetje bij een moment in de opname, zodat je het terugvindt.
+
+- Tijdens het opnemen: druk op ⌃⌥⌘M, kies **Markeer dit moment** in het menu, of klik op het vlaggetje naast de stopknop in het venster. Een kort geluid bevestigt het.
+- Tijdens het luisteren: klik op het vlaggetje rechts van de afspeelknop, of druk op ⌘D of ⌃⌥⌘M. De marker komt waar je bent in de opname.
+- De vlaggetjes staan op de positiebalk en in het transcript, voor de zin waarin de marker valt. Onder de alinea staat de tijd van de marker: klik erop om vanaf daar te luisteren. Is er nog geen transcript, dan staan de markers onder **Transcribeer**.
+- Een notitie: klik op **Notitie toevoegen…** onder de marker, typ één regel en klik op **Bewaar**. Tijdens het afspelen verschijnt de notitie even boven de positiebalk als je bij de marker komt. Maak het veld leeg om de notitie weg te halen; de marker blijft.
+- Verwijderen: klik met de rechtermuisknop op de marker en kies **Verwijder marker**. Vergist? Klik op **Herstel** in de melding die een paar seconden blijft staan.
+- Markers en notities staan ook in het transcript (`.md`), de pdf, de afdruk en de webpagina, als een regel `🚩 12:34 notitie` onder de alinea waarin de marker valt. Synchroniseer je via iCloud, dan zie je markers van je iPhone ook op je Mac, en andersom.
+
 ## Dicteren {#dictation}
-Druk op ⌃⌥⌘D, praat, en de tekst komt waar je cursor staat: in een chat, een mail, een editor of Terminal.
+Druk op ⌃⌥⌘D, praat, en je tekst staat op het klembord. Plak hem met ⌘V waar je cursor staat: in een chat, een mail, een editor of Terminal.
 
 De sneltoets werkt op twee manieren:
 
 - **Tik** op ⌃⌥⌘D: Band·je luistert tot je op Return drukt, of nog een keer op ⌃⌥⌘D. De Return zelf gaat niet naar de app.
-- **Houd** ⌃⌥⌘D vast: Band·je luistert zolang je de toetsen vasthoudt en plakt als je loslaat.
+- **Houd** ⌃⌥⌘D vast: Band·je luistert zolang je de toetsen vasthoudt en zet de tekst op het klembord als je loslaat.
 
 Esc breekt af. Het icoon in de menubalk is oranje zolang Band·je luistert, met de tijd ernaast. Eén keer dicteren duurt maximaal vijf minuten; in de laatste 30 seconden knippert de tijd.
 
 ### Plakken
-De tekst staat altijd op het klembord. Om hem voor je te plakken, moet Band·je een toetsaanslag (⌘V) mogen sturen: kies **Zet automatisch plakken aan…** in het menu, of ga naar Systeeminstellingen > Privacy en beveiliging > Toegankelijkheid en zet Band·je aan. Zonder die toestemming plak je zelf met ⌘V.
-
-macOS vertelt een draaiende Band·je pas na een herstart dat je deze toestemming hebt gegeven. Net aangezet? Kies **Herstart Band·je voor automatisch plakken** in het menu, of **Herstart Band·je** in [Instellingen](#settings).
-
-Hoor je een kort geluid in plaats van dat de tekst verschijnt, dan heeft een wachtwoordveld of een andere app secure input aangezet (Veilige toetsenbordinvoer in Terminal, een wachtwoordmanager). macOS houdt het plakken dan tegen; de tekst staat op het klembord, dus druk zelf op ⌘V.
+Na het dicteren staat de tekst op het klembord en staat er even ⌘V naast het cassettebandje. Druk op ⌘V om hem te plakken waar je cursor staat. De tekst blijft op het klembord tot je iets anders kopieert, dus je kunt hem ook later of op meer plekken plakken.
 
 Wat je dicteert, wordt nergens bewaard.
 
@@ -152,7 +161,7 @@ Zet **Open Band·je bij inloggen** aan en Band·je staat na het inloggen vanzelf
 Band·je volgt de taal van macOS. Wil je alleen voor Band·je een andere taal, kies die dan hier en klik op **Herstart Band·je**. Menu's, vensters, nieuwe transcripten en Help gaan om. **Zoals macOS** zet het terug.
 
 ### Sneltoetsen
-Klik op een veld en druk de nieuwe combinatie in. Daarin moet ⌘, ⌃ of ⌥ zitten, of het is een functietoets. Esc annuleert, **Herstel standaard** zet ⌃⌥⌘R en ⌃⌥⌘D terug.
+Klik op een veld en druk de nieuwe combinatie in. Daarin moet ⌘, ⌃ of ⌥ zitten, of het is een functietoets. Esc annuleert, **Herstel standaard** zet ⌃⌥⌘R, ⌃⌥⌘D en ⌃⌥⌘M terug. ⌃⌥⌘M (**Markeer dit moment**) werkt overal tijdens een opname, en daarbuiten in het Band·je-venster. Buiten een opname kan een andere app dezelfde combinatie gebruiken.
 
 Gebruikt een andere app de combinatie al, dan meldt Band·je dat en blijft de oude staan.
 
@@ -170,7 +179,25 @@ Klik op **Wijzig…** en kies een map, waar dan ook op je Mac of op een externe 
 Staat de map in iCloud Drive, Dropbox of een andere clouddienst (ook Bureaublad en Documenten als die in iCloud staan), dan waarschuwt Band·je je: je opnames verlaten dan via die dienst je Mac.
 
 ### Toegang
-Of Band·je de microfoon mag gebruiken, voor je mag plakken en het geluid van je Mac mag opnemen, met per onderdeel een knop (**Sta toe…** of **Open instellingen…**). Een groen vinkje betekent toegestaan; de stand ververst vanzelf als je terugkomt uit Systeeminstellingen. Zie [Problemen oplossen](#troubleshooting).
+Of Band·je de microfoon mag gebruiken en het geluid van je Mac mag opnemen, met per onderdeel een knop (**Sta toe…** of **Open instellingen…**). Een groen vinkje betekent toegestaan; de stand ververst vanzelf als je terugkomt uit Systeeminstellingen. Zie [Problemen oplossen](#troubleshooting).
+
+## Band·je Onbeperkt {#purchases}
+Wat gratis is, wat de twee aankopen ontgrendelen en hoe je ze herstelt (Band·je uit de App Store).
+
+Band·je is gratis. Opnemen is altijd gratis en nooit beperkt.
+
+- **Transcriberen** is gratis voor je eerste 5 opnames. Een opname telt één keer, als de eerste transcriptie klaar is; dezelfde opname opnieuw transcriberen is gratis.
+- **Dicteren** is gratis voor in totaal 15 minuten gedicteerde audio. Een dictaat dat loopt als de minuten op zijn, gaat gewoon door tot het eind. Na 10 minuten zegt Band·je één keer hoeveel gratis minuten er nog over zijn; het menu in de menubalk laat het ook zien.
+- Wat je al hebt blijft van jou: transcripten, samenvattingen, delen en exporteren gaan nooit op slot. Samenvattingen zijn gratis bij elk transcript.
+
+Twee aankopen, elk één keer betalen, geen abonnement:
+
+- **Band·je Onbeperkt**: transcriberen en dicteren zonder limiet.
+- **Band·je Dicteren**: dicteren zonder limiet.
+
+Koop ze in **Instellingen… › Aankopen**, of kies **Koop Band·je Onbeperkt…** in het menu Band·je terwijl het venster open is. Zijn de gratis transcripties gebruikt, dan toont **Transcribeer** eerst Band·je Onbeperkt; een automatische transcriptie start dan niet, en de opname zegt dat.
+
+Kocht je Band·je voordat het gratis werd, dan is alles ontgrendeld, zonder dat je iets hoeft te doen. Een aankoop werkt op elke Mac, iPhone en iPad met hetzelfde Apple-account, en met Delen met gezin. Kies op een andere Mac **Herstel aankopen**. Het gratis deel telt per apparaat. Het welkomstvenster zegt wat gratis is, met **Al gekocht? Herstel aankopen**.
 
 ## Privacy en netwerk {#privacy}
 Je audio, transcripten en samenvattingen verlaten je Mac nooit.
@@ -199,15 +226,14 @@ Oplossingen voor dingen die mis kunnen gaan.
 Veel problemen komen door een ontbrekende toestemming. Kies **Instellingen…** en kijk onder **Toegang**:
 
 - **Microfoon**: nodig om je stem op te nemen en om te dicteren.
-- **Geluid van je Mac**: nodig om de andere kant op te nemen. macOS laat apps deze toestemming niet uitlezen, dus Band·je laat zien wat er bij de laatste opname gebeurde: er kwam geluid binnen, of het was stil. Stil is normaal als er niets afspeelde.
-- **Automatisch plakken**: nodig om gedicteerde tekst voor je te plakken.
+- **Geluid van je Mac**: nodig om de andere kant op te nemen. macOS laat apps deze toestemming niet uitlezen, dus Band·je controleert het zelf: het speelt een halve seconde een onhoorbaar signaal dat nooit je speakers of AirPods bereikt, en kijkt of het binnenkomt. **Sta toe…** laat macOS het vragen; na **Open instellingen…** verschijnt het vinkje zodra je Band·je hebt aangezet.
 
 Een groen vinkje betekent toegestaan. Anders: klik op **Open instellingen…**, zet Band·je aan en kom terug; Band·je ziet het vanzelf.
 
-Bij elke start controleert Band·je de microfoon en automatisch plakken, en meldt het als er een ontbreekt. Heb je automatisch plakken niet nodig? Vink **Toon deze melding niet opnieuw** aan, of zet **Waarschuw bij het starten als er iets ontbreekt** uit onder Toegang.
+Bij elke start controleert Band·je de microfoon, en het geluid van je Mac als dat uit stond, en meldt het als er een ontbreekt. Wil je de melding niet? Vink **Toon deze melding niet opnieuw** aan, of zet **Waarschuw bij het starten als er iets ontbreekt** uit onder Toegang.
 
 ### De andere kant ontbreekt in de opname
-macOS staat niet toe dat Band·je het geluid van je Mac opneemt. Ga naar Systeeminstellingen > Privacy en beveiliging > Scherm- en systeemaudio-opname en zet Band·je aan bij Alleen systeemaudio-opname.
+macOS staat niet toe dat Band·je het geluid van je Mac opneemt. Band·je waarschuwt je daarvoor bij het begin van een opname. Ga naar Systeeminstellingen > Privacy en beveiliging > Scherm- en systeemaudio-opname en zet Band·je aan bij Alleen systeemaudio-opname. Werkt het daarna nog niet meteen? Herstart Band·je.
 
 ### Mijn eigen stem ontbreekt
 Kijk in het menu **Microfoon**. Met de klep dicht staat de ingebouwde microfoon uit: kies een andere. Mag Band·je de microfoon helemaal niet gebruiken, zet het dan aan in Systeeminstellingen > Privacy en beveiliging > Microfoon.

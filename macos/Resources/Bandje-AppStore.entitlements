@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   App Store build (mas/project.yml, scripts/mas.sh): Bandje.entitlements plus iCloud Documents for
-  the opt-in "Sync with iCloud" (iCloud Drive only, never CloudKit; CLAUDE.md limit 8). network.client is only for the Desert Ant Labs SDK's
+  the opt-in "Sync with iCloud" (iCloud Drive only, never CloudKit). network.client is only for the Desert Ant Labs SDK's
   license check (at most once per model per month); Bandje's own code never uses the network.
   Never add network.server.
 -->
@@ -33,6 +33,12 @@
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudDocuments</string>
+	</array>
+	<!-- App Group shared with the team's other apps: only pro.jws (ProStatusExporter.swift,
+	     docs/pro-sharing.md). BANDJE_APP_GROUP comes from mas/project.yml. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(BANDJE_APP_GROUP)</string>
 	</array>
 </dict>
 </plist>

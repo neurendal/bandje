@@ -1,20 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AVFoundation
+import BandjeKit
 import CoreLocation
 import Foundation
 import Observation
 import Synchronization
 import UIKit
 
-struct RecorderError: LocalizedError {
+/// `CustomLocalizedStringResourceConvertible`: an intent (Siri, the Action button, the Control)
+/// that throws it shows this message instead of a generic error.
+struct RecorderError: LocalizedError, CustomLocalizedStringResourceConvertible {
     let message: String
     var errorDescription: String? { message }
+    var localizedStringResource: LocalizedStringResource { "\(message)" }
 
     static var permissionDenied: RecorderError {
         RecorderError(message: String(localized: "Bandje has no access to the microphone. Allow it in Settings > Apps > Bandje."))
     }
     static var noInput: RecorderError {
         RecorderError(message: String(localized: "No microphone available."))
+    }
+    static var diskFull: RecorderError {
+        RecorderError(message: String(localized: "There is not enough free space on this \(Device.name) to record. Free up space and try again."))
     }
 }
 
@@ -28,6 +35,12 @@ final class Recorder {
 
     enum State: Equatable { case idle, recording, paused, finishing }
 
+    /// Why a recording stopped by itself; it is kept (stopped, converted and saved as usual).
+    enum StopReason: Equatable { case diskFull, writeFailed, maxLength }
+
+    /// The longest recording (owner, 2026-11-09): about 4 GB of CAF before it becomes `.m4a`.
+    nonisolated static let maxDuration: TimeInterval = 12 * 3600
+
     private(set) var state: State = .idle
     /// Recorded time, pauses excluded.
     private(set) var elapsed: TimeInterval = 0
@@ -38,6 +51,11 @@ final class Recorder {
     /// An interruption paused the recording and iOS did not ask to resume: tell the user.
     var interruptionNotice = false
     var errorMessage: String?
+    /// The disk is getting full (`DiskSpace.Level.low`): a gentle warning while recording.
+    private(set) var diskLow = false
+    /// Why the last recording stopped by itself (or could not be converted): an alert in the
+    /// library, also when the app comes to the front later. The view clears it.
+    var stopNotice: String?
     /// Inputs to choose from (only shown when there is more than one).
     private(set) var inputs: [AVAudioSessionPortDescription] = []
     private(set) var currentInput: String?
@@ -53,6 +71,11 @@ final class Recorder {
     private var source: (any CaptureSource)?
     private var meta: RecordingMeta?
     private var ticker: Task<Void, Never>?
+    private var diskWatch: Task<Void, Never>?
+    private var autoStopping = false
+    /// Between the start request and the recording running (the microphone question is awaited):
+    /// a second start meanwhile does nothing.
+    private var starting = false
     private var pausedByInterruption = false
     /// Where finished recordings went when syncing moved them to iCloud (for a late location fix).
     private var published: [URL: URL] = [:]
@@ -90,14 +113,23 @@ final class Recorder {
 
     /// Starts a new recording from the microphone, or from `source` (the DEBUG fake mic).
     func start(source given: (any CaptureSource)? = nil) async throws {
-        guard state == .idle else { return }
+        guard state == .idle, !starting else { return }
+        starting = true
+        defer { starting = false }
+        // P7: the microphone would hear the player; it stays paused afterwards.
+        Playback.player.pause(reason: .recordingStarted)
         let source: any CaptureSource
         if let given {
             source = given
         } else {
             guard await AVAudioApplication.requestRecordPermission() else { throw RecorderError.permissionDenied }
-            source = MicSource()
+            let mic = MicSource()
+            mic.onRestartFailed = { [weak self] in self?.inputLost() }
+            source = mic
         }
+        // Not when the disk is (almost) full: a recording needs room, and so does iOS.
+        let disk = DiskSpace.level(at: Storage.documents)
+        guard disk != .tooLow else { throw RecorderError.diskFull }
         let date = Date()
         let caf = try Storage.newRecording(title: Storage.defaultTitle(for: date), date: date)
         let folder = caf.deletingLastPathComponent()
@@ -117,7 +149,11 @@ final class Recorder {
         markers = []
         elapsed = 0
         interruptionNotice = false
+        pausedByInterruption = false
+        resumeWhenActive = false
         errorMessage = nil
+        diskLow = disk == .low
+        autoStopping = false
         state = .recording
         log("started")
         refreshInputs()
@@ -133,6 +169,57 @@ final class Recorder {
                 self?.tick()
                 try? await Task.sleep(for: .milliseconds(100))
             }
+        }
+        diskWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(DiskSpace.checkInterval))
+                guard !Task.isCancelled, let self, self.isActive, let folder = self.folder else { return }
+                let level = await Task.detached(priority: .utility) { DiskSpace.level(at: folder) }.value
+                self.diskChecked(level)
+            }
+        }
+    }
+
+    /// Every `DiskSpace.checkInterval` while recording.
+    private func diskChecked(_ level: DiskSpace.Level) {
+        guard isActive else { return }
+        diskLow = level != .ok
+        if let reason = Self.autoStopReason(elapsed: elapsed, writeFailed: false, disk: level) { autoStop(reason) }
+    }
+
+    /// Whether a running recording must stop by itself: the disk is too full, writing failed, or it
+    /// reached the maximum length. Pure (unit-tested).
+    nonisolated static func autoStopReason(elapsed: TimeInterval, writeFailed: Bool, disk: DiskSpace.Level?) -> StopReason? {
+        if disk == .tooLow { return .diskFull }
+        if writeFailed { return .writeFailed }
+        if elapsed >= maxDuration { return .maxLength }
+        return nil
+    }
+
+    /// Stops the normal way (converted, saved, opened, transcribed when that is on) and says why:
+    /// an alert in the app (shown when Bandje is next in front).
+    private func autoStop(_ reason: StopReason) {
+        guard isActive, !autoStopping else { return }
+        autoStopping = true
+        log("auto-stop")
+        Task {
+            stopNotice = nil
+            await RecordingCommands.stop()
+            autoStopping = false
+            // After the reason, what stop() said (a conversion that failed).
+            let message = [Self.message(for: reason), stopNotice].compactMap { $0 }.joined(separator: "\n\n")
+            stopNotice = message
+        }
+    }
+
+    nonisolated static func message(for reason: StopReason) -> String {
+        switch reason {
+        case .diskFull:
+            String(localized: "The recording stopped because this \(Device.name) is almost full. What was recorded has been saved.")
+        case .writeFailed:
+            String(localized: "The recording stopped because writing it failed. What was recorded has been saved.")
+        case .maxLength:
+            String(localized: "The recording stopped after 12 hours, the longest a recording can be. It has been saved.")
         }
     }
 
@@ -151,11 +238,7 @@ final class Recorder {
         resumeWhenActive = false
         do {
             try source?.resume()
-            state = .recording
-            interruptionNotice = false
-            errorMessage = nil
-            log("resumed")
-            LiveRecording.shared.sync(self)
+            resumed()
         } catch {
             // Usually another app (a call) still holds the microphone.
             errorMessage = String(localized: "The microphone is in use by another app. Try again in a moment.")
@@ -178,16 +261,31 @@ final class Recorder {
         log("location")
     }
 
+    /// Recording again after a pause (by the user or an interruption).
+    private func resumed() {
+        state = .recording
+        pausedByInterruption = false
+        interruptionNotice = false
+        errorMessage = nil
+        log("resumed")
+        LiveRecording.shared.sync(self)
+    }
+
+    /// The microphone could not be taken back after the input changed (AirPods in or out), also
+    /// not on a second try: paused, with the interruption notice; Resume goes on.
+    private func inputLost() {
+        guard state == .recording else { return }
+        log("input-lost")
+        pause()
+        interruptionNotice = true
+    }
+
     /// After an interruption: resume if possible, else wait until Bandje is in front again.
     private func resumeAfterInterruption() {
         guard state == .paused, let source else { return }
         do {
             try source.resume()
-            state = .recording
-            interruptionNotice = false
-            errorMessage = nil
-            log("resumed")
-            LiveRecording.shared.sync(self)
+            resumed()
         } catch {
             log("resume-deferred")
             interruptionNotice = true
@@ -214,22 +312,38 @@ final class Recorder {
     @discardableResult
     func stop() async -> URL? {
         guard isActive, let writer, let folder else { return nil }
+        // Stopped from the Lock Screen, Siri or the Control, Bandje may be in the background:
+        // converting and saving must finish before iOS suspends it.
+        let background = UIApplication.shared.beginBackgroundTask(withName: "Stop recording")
+        defer { if background != .invalid { UIApplication.shared.endBackgroundTask(background) } }
         state = .finishing
         resumeWhenActive = false
+        pausedByInterruption = false
         source?.stop()
         source = nil
         ticker?.cancel()
+        diskWatch?.cancel()
+        diskWatch = nil
         tick()
         LiveRecording.shared.sync(self)  // ends the Live Activity right away, before converting
         log("stopping")
         let caf = writer.url
-        let result = await Task.detached(priority: .userInitiated) {
+        let (result, seconds) = await Task.detached(priority: .userInitiated) {
             writer.finish()
-            return Result { try AudioExport.convertToM4A(caf) }
+            let result = Result { try AudioExport.convertToM4A(caf) }
+            // The length goes into `.bandje.json`: the Mac shows it while the audio is still in iCloud.
+            return (result, Storage.duration(of: (try? result.get()) ?? caf))
         }.value
+        meta?.setDuration(seconds)
         if case .failure(let error) = result {
-            // The CAF stays; the next launch tries again (recovery).
+            // The CAF stays: the library shows it (playable, deletable), and the next launch tries
+            // again when there is room (recovery). Not `recording` any more.
             errorMessage = error.localizedDescription
+            meta?.recording = nil
+            try? meta?.write(to: folder)
+            if stopNotice == nil {
+                stopNotice = String(localized: "The recording has been saved, but could not be converted yet. Bandje tries again at the next launch, when there is enough free space.")
+            }
             log("convert-failed")
         } else {
             meta?.recording = nil
@@ -240,11 +354,13 @@ final class Recorder {
         self.folder = nil
         meta = nil
         level = 0
+        diskLow = false
         // Syncing: the finished recording moves to iCloud (an unconverted CAF stays for recovery).
-        let final = result.isSuccess ? await Task.detached { Storage.publish(folder) }.value : folder
+        let converted = (try? result.get()) != nil
+        let final = converted ? await Task.detached { Storage.publish(folder) }.value : folder
         if final != folder { published[folder] = final }
         state = .idle
-        return final
+        return Storage.canonical(final)
     }
 
     func selectInput(_ port: AVAudioSessionPortDescription) {
@@ -256,9 +372,9 @@ final class Recorder {
         guard let writer else { return }
         elapsed = writer.seconds
         level = state == .recording ? writer.level : 0
-        if writer.failed, errorMessage == nil {
-            errorMessage = String(localized: "Writing the recording failed. Is the \(Device.name) full?")
-        }
+        guard isActive else { return }
+        // Writing failed (the disk is full, or the file is gone), or the maximum length: stop and keep it.
+        if let reason = Self.autoStopReason(elapsed: elapsed, writeFailed: writer.failed, disk: nil) { autoStop(reason) }
     }
 
     private func interruption(_ type: AVAudioSession.InterruptionType?, shouldResume: Bool) {
@@ -325,6 +441,8 @@ final class MicSource: CaptureSource, @unchecked Sendable {
     private var sink: (@Sendable ([Float], Double) -> Void)?
     private var running = false
     private var observer: NSObjectProtocol?
+    /// Called (on the main thread) when the input could not be restarted, also after a retry.
+    var onRestartFailed: (@MainActor () -> Void)?
 
     func start(sink: @escaping @Sendable ([Float], Double) -> Void, onEnd: @escaping @Sendable () -> Void) throws {
         let session = AVAudioSession.sharedInstance()
@@ -383,7 +501,22 @@ final class MicSource: CaptureSource, @unchecked Sendable {
     private func restart() {
         guard running else { return }
         engine.stop()
-        do { try run() } catch { print("Bandje: input restart failed: \(error)") }
+        do {
+            try run()
+        } catch {
+            // Often the new route is not ready yet: once more after a moment, then tell the recorder.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.running else { return }  // stopped or paused meanwhile
+                    do {
+                        try self.run()
+                    } catch {
+                        self.running = false
+                        self.onRestartFailed?()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -529,21 +662,35 @@ enum LocationTag {
     }
 }
 
-extension Result {
-    var isSuccess: Bool { if case .success = self { true } else { false } }
-}
-
 enum AudioExport {
-    /// Puts the cassette cover (and the title) into the recording's own `.m4a`, once per title and
-    /// length, in the background: sharing then hands over the file right away, and Files, Finder and
-    /// music apps show the cover too. Passthrough (the audio is not re-encoded), written next to the
-    /// file and swapped in. Other formats are left as they are.
-    static func embedCover(_ recording: Recording) async {
+    /// Puts the cassette cover (and the title) into the recording's own `.m4a`, once per title,
+    /// length and colour, in the background: sharing then hands over the file right away, and Files,
+    /// Finder and music apps show the cover too. Passthrough (the audio is not re-encoded), written
+    /// next to the file and swapped in. Other formats are left as they are.
+    /// Only when `CoverPolicy.plan` says so (../specs/icloud-sync.md, owner 2026-11-10): for a change
+    /// made on this device (`own`: its rename or colour), or for a recording that never had a cover;
+    /// never as a reaction to a rename or colour from the Mac (the Mac writes that cover), and only
+    /// while `.bandje.json` and the audio are the newest versions here. Own change with the audio
+    /// still in iCloud: the key is removed, so a device that has the audio makes the cover.
+    /// `afterExport` runs between the export and noting the key (tests: a colour set meanwhile).
+    static func embedCover(_ recording: Recording, own: Bool, afterExport: () async -> Void = {}) async {
         guard let audio = recording.audio, audio.pathExtension.lowercased() == "m4a" else { return }
+        let metaFile = RecordingMeta.url(in: recording.folder)
+        // Strict: a copy here whose newer version is still coming (`.downloaded`) is not current.
+        let audioIsCurrent = recording.audioIsLocal && FileManager.default.fileExists(atPath: audio.path)
+            && CoverPolicy.isUpToDate(audio)
         let key = CoverArt.key(for: recording)
-        var meta = RecordingMeta.read(from: recording.folder) ?? RecordingMeta(created: recording.date)
-        guard meta.coverKey != key, let cover = await CoverArt.file(for: recording),
-              let art = try? Data(contentsOf: cover) else { return }
+        switch CoverPolicy.plan(storedKey: RecordingMeta.read(from: recording.folder)?.coverKey, currentKey: key, ownChange: own,
+                                metaIsCurrent: CoverPolicy.isUpToDate(metaFile), audioIsCurrent: audioIsCurrent) {
+        case .leave:
+            return
+        case .clearKey:
+            _ = try? RecordingMeta.update(in: recording.folder, created: recording.date, onlyIfCurrent: true) { $0.coverKey = nil }
+            return
+        case .embed:
+            break
+        }
+        guard let cover = await CoverArt.file(for: recording), let art = try? Data(contentsOf: cover) else { return }
         let asset = AVURLAsset(url: audio)
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else { return }
         let artwork = AVMutableMetadataItem()
@@ -557,9 +704,17 @@ enum AudioExport {
         let temp = recording.folder.appending(path: ".embedding-\(UUID().uuidString).m4a")
         do {
             try await session.export(to: temp, as: .m4a)
+            await afterExport()
+            // The export takes seconds: a newer `.bandje.json` or audio from the Mac that started
+            // coming meanwhile wins, this cover is dropped.
+            guard CoverPolicy.isUpToDate(metaFile), CoverPolicy.isUpToDate(audio) else {
+                try? FileManager.default.removeItem(at: temp)
+                return
+            }
             try Storage.coordinated(writing: audio, options: .forReplacing) { _ = try FileManager.default.replaceItemAt($0, withItemAt: temp) }
-            meta.coverKey = key
-            try meta.write(to: recording.folder)
+            // Only the key, into the file as it is now: the export takes seconds, and a colour (or
+            // anything else) written meanwhile must stay (a rename and a new colour together).
+            try RecordingMeta.update(in: recording.folder, created: recording.date, onlyIfCurrent: true) { $0.coverKey = key }
         } catch {
             try? FileManager.default.removeItem(at: temp)
         }
@@ -588,9 +743,7 @@ enum AudioExport {
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32_768) else {
                 throw RecorderError(message: "buffer")
             }
-            while input.framePosition < input.length {
-                try input.read(into: buffer)
-                if buffer.frameLength == 0 { break }
+            while try input.readNext(into: buffer) {  // BandjeKit: the end, also of a file that says it is longer
                 try output.write(from: buffer)
             }
             output.close()

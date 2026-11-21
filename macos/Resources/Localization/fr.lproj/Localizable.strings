@@ -48,7 +48,7 @@
 /* About.swift | NL: Versie %1$@ (%2$@) */
 "about.version" = "Version %1$@ (%2$@)";
 
-/* Transcriber.swift | NL: %@ bevat geen bruikbare audio. */
+/* ICloud.swift | NL: %@ bevat geen bruikbare audio. */
 "audio.empty" = "%@ ne contient aucun son exploitable.";
 
 /* Transcriber.swift | NL: Lezen van %1$@ mislukt: %2$@ */
@@ -144,8 +144,8 @@
 /* Recorder.swift | NL: De schijf is bijna vol (nog %@ MB vrij). De opname is gestopt; wat tot nu toe is opgenomen, blijft bewaard. */
 "error.diskFull" = "Le disque est presque plein (%@ Mo libres). L’enregistrement s’est arrêté ; tout ce qui a été enregistré est conservé.";
 
-/* Recorder.swift | NL: Te weinig schijfruimte: nog %@ MB vrij. Een opname gebruikt ongeveer 25 MB per minuut. Maak ruimte vrij en probeer opnieuw. */
-"error.diskStart" = "Espace disque insuffisant : %@ Mo libres. Un enregistrement utilise environ 25 Mo par minute. Libérez de l’espace et réessayez.";
+/* Recorder.swift | NL: Te weinig schijfruimte om op te nemen: nog %1$@ MB vrij, Band·je heeft minstens %2$@ MB nodig. Maak ruimte vrij en probeer opnieuw. */
+"error.diskStart" = "Espace disque insuffisant pour enregistrer : %1$@ Mo libres, Band·je a besoin d’au moins %2$@ Mo. Libérez de l’espace et réessayez.";
 
 /* FileWriter.swift | NL: Kan het opnamebestand niet maken in %1$@ (fout %2$@). */
 "error.fileCreate" = "Impossible de créer le fichier d’enregistrement dans %1$@ (erreur %2$@).";
@@ -177,20 +177,23 @@
 /* Recorder.swift | NL: Systeemaudio opnemen lukt niet (fout %@). Zet Band·je aan bij Systeeminstellingen > Privacy en beveiliging > Scherm- en systeemaudio-opname. */
 "error.tap" = "Impossible d’enregistrer le son du système (erreur %@). Activez Band·je dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système.";
 
+/* Recorder.swift | NL: De opname is na 12 uur gestopt, de langste opname die Band·je maakt. Wat is opgenomen, blijft bewaard. Start een nieuwe opname om verder op te nemen. */
+"error.tooLong" = "L’enregistrement s’est arrêté après 12 heures, l’enregistrement le plus long que fait Band·je. Ce qui a été enregistré est conservé. Lancez un nouvel enregistrement pour continuer.";
+
 /* Transcriber.swift | NL: Sprekerherkenning (Who) mislukt (%@). Draai scripts/fetch-models.sh opnieuw als het model beschadigd is. */
 "error.who" = "Échec de la reconnaissance des locuteurs (Who) (%@). Relancez scripts/fetch-models.sh si le modèle est endommagé.";
 
 /* Recorder.swift | NL: Schrijven naar het opnamebestand mislukt (fout %@). De opname is gestopt; wat tot nu toe is opgenomen, blijft bewaard. */
 "error.writeFailed" = "Échec de l’écriture dans le fichier d’enregistrement (erreur %@). L’enregistrement s’est arrêté ; tout ce qui a été enregistré est conservé.";
 
-/* RecordingView.swift | NL: Webpagina maken… */
-"export.busy" = "Création de la page web…";
+/* RecordingView.swift | NL: Audiopagina maken… */
+"export.busy" = "Création de la page audio…";
 
 /* BandjeApp.swift | NL: Compact */
 "export.compact" = "Compact";
 
-/* BandjeApp.swift | NL: Webpagina maken mislukt */
-"export.failed" = "Impossible de créer la page web";
+/* BandjeApp.swift | NL: Audiopagina maken mislukt */
+"export.failed" = "Impossible de créer la page audio";
 
 /* BandjeApp.swift | NL: Zoals opgenomen */
 "export.full" = "Tel qu’enregistré";
@@ -198,11 +201,11 @@
 /* WebExport.swift | NL: Alles op je eigen apparaat: geen tokens, supersnel, met wie wat zei, in 25 talen. */
 "export.made" = "Tout sur votre propre appareil : aucun jeton, ultra-rapide, avec qui a dit quoi, en 25 langues.";
 
-/* RecordingView.swift | NL: Webpagina met audio… */
-"export.menu" = "Page web avec audio…";
+/* RecordingView.swift | NL: Audiopagina… */
+"export.menu" = "Page audio…";
 
-/* RecordingView.swift | NL: Webpagina met audio, compact (voor mail)… */
-"export.menu.compact" = "Page web avec audio, compacte (pour e-mail)…";
+/* RecordingView.swift | NL: Audiopagina, compact (voor mail)… */
+"export.menu.compact" = "Page audio, compacte (pour e-mail)…";
 
 /* WebExport.swift | NL: Open deze pagina in een browser, zoals Safari, om te luisteren en het transcript te volgen. */
 "export.noscript" = "Ouvrez cette page dans un navigateur comme Safari pour écouter et suivre la transcription.";
@@ -255,6 +258,9 @@
 /* BandjeApp.swift | NL: %1$@ is al in gebruik door een andere app (fout %2$@). Dicteren kan via het menu, of kies een andere sneltoets. */
 "hotkey.dictate.taken" = "%1$@ est déjà utilisé par une autre app (erreur %2$@). Vous pouvez dicter depuis le menu, ou choisir un autre raccourci.";
 
+/* BandjeApp.swift | NL: %1$@ is al in gebruik door een andere app (fout %2$@). Markeren kan via het menu, of kies een andere sneltoets. */
+"hotkey.mark.taken" = "%1$@ est déjà utilisé par une autre app (erreur %2$@). Vous pouvez marquer depuis le menu, ou choisir un autre raccourci.";
+
 /* BandjeApp.swift | NL: %1$@ is al in gebruik door een andere app (fout %2$@). Start en stop opnames via het menu, of kies een andere sneltoets. */
 "hotkey.record.taken" = "%1$@ est déjà utilisé par une autre app (erreur %2$@). Démarrez et arrêtez les enregistrements depuis le menu, ou choisissez un autre raccourci.";
 
@@ -276,11 +282,20 @@
 /* BandjeApp.swift | NL: Opnames uit iCloud naar %@ kopiëren? */
 "icloud.copy.title" = "Copier les enregistrements d’iCloud vers %@ ?";
 
+/* BandjeApp.swift | NL: De schijf is bijna vol; Band·je is gestopt met kopiëren. Niet gekopieerd: */
+"icloud.copyDiskFull" = "Le disque est presque plein ; Band·je a arrêté la copie. Non copié :";
+
 /* BandjeApp.swift | NL: Niet alles gekopieerd */
 "icloud.copyFailed" = "Tout n’a pas été copié";
 
 /* ICloud.swift | NL: %@ staat nog in iCloud en kon niet worden opgehaald. */
 "icloud.downloadFailed" = "%@ est encore dans iCloud et n’a pas pu être téléchargé.";
+
+/* BandjeApp.swift | NL: Deze opnames staan al in iCloud, maar Band·je weet niet zeker dat het dezelfde of volledige zijn. Ze blijven staan in %@, zodat er niets verloren gaat: */
+"icloud.keptLocal" = "Ces enregistrements sont déjà dans iCloud, mais Band·je n’est pas sûr qu’ils soient identiques ou complets. Ils restent dans %@, pour que rien ne soit perdu :";
+
+/* BandjeApp.swift | NL: Niet alles verplaatst */
+"icloud.keptLocal.title" = "Tout n’a pas été déplacé";
 
 /* BandjeApp.swift | NL: Laat staan */
 "icloud.move.leave" = "Les laisser";
@@ -294,11 +309,32 @@
 /* BandjeApp.swift | NL: Bestaande opnames naar iCloud verplaatsen? */
 "icloud.move.title" = "Déplacer les enregistrements existants vers iCloud ?";
 
-/* BandjeApp.swift | NL: Naar iCloud verplaatsen lukte niet; Band·je probeert het opnieuw bij de volgende start. %@ */
-"icloud.publishFailed" = "Le déplacement vers iCloud a échoué ; Band·je réessaiera au prochain démarrage. %@";
+/* ICloud.swift | NL: Er is niet genoeg ruimte in iCloud. */
+"icloud.pending.full" = "Il n’y a pas assez d’espace dans iCloud.";
+
+/* ICloud.swift | NL: Deze Mac is niet ingelogd bij iCloud. */
+"icloud.pending.noAccount" = "Ce Mac n’est pas connecté à iCloud.";
+
+/* ICloud.swift | NL: iCloud Drive staat uit voor Band·je op deze Mac. */
+"icloud.pending.noDrive" = "iCloud Drive est désactivé pour Band·je sur ce Mac.";
+
+/* BandjeApp.swift | NL: Je opname staat veilig op deze Mac en staat gewoon in Band·je: je kunt hem afspelen, transcriberen, hernoemen en verwijderen. Band·je zet hem in iCloud zodra dat lukt. */
+"icloud.pending.text" = "Votre enregistrement est en sécurité sur ce Mac et apparaît normalement dans Band·je : vous pouvez l’écouter, le transcrire, le renommer et le supprimer. Band·je le déplace vers iCloud dès que possible.";
+
+/* BandjeApp.swift | NL: Nog niet in iCloud */
+"icloud.pending.title" = "Pas encore dans iCloud";
+
+/* ICloud.swift | NL: iCloud Drive is nu niet bereikbaar. */
+"icloud.pending.unavailable" = "iCloud Drive est injoignable pour le moment.";
 
 /* BandjeApp.swift | NL: Niet naar iCloud verplaatst */
 "icloud.publishFailed.title" = "Non déplacé vers iCloud";
+
+/* FileWriter.swift | NL: Band·je kan de audio in %@ niet omzetten. */
+"import.convertFailed" = "Band·je ne peut pas convertir l’audio de %@.";
+
+/* FileWriter.swift | NL: %@ is geen audio- of videobestand dat Band·je kan openen. */
+"import.notAudio" = "%@ n’est pas un fichier audio ou vidéo que Band·je peut ouvrir.";
 
 /* MainWindow.swift | NL: Opnames laden… */
 "library.loading" = "Chargement des enregistrements…";
@@ -312,8 +348,32 @@
 /* Library.swift | NL: Gisteren */
 "library.yesterday" = "Hier";
 
+/* RecordingView.swift | NL: Notitie toevoegen… */
+"marker.addNote" = "Ajouter une note…";
+
+/* RecordingView.swift | NL: Notitie… */
+"marker.note" = "Note…";
+
+/* RecordingView.swift | NL: Notitie bij %@ */
+"marker.noteTitle" = "Note à %@";
+
+/* RecordingView.swift | NL: Speel af vanaf deze marker */
+"marker.play" = "Lire à partir de ce repère";
+
+/* RecordingView.swift | NL: Verwijder marker */
+"marker.remove" = "Supprimer le repère";
+
+/* RecordingView.swift | NL: Marker verwijderd */
+"marker.removed" = "Repère supprimé";
+
+/* RecordingView.swift | NL: Herstel */
+"marker.undo" = "Annuler";
+
 /* BandjeApp.swift | NL: Over Band·je */
 "menu.about" = "À propos de Band·je";
+
+/* BandjeApp.swift | NL: Koop %@… */
+"menu.buy" = "Acheter %@…";
 
 /* BandjeApp.swift | NL: Recente opnames */
 "menu.choose" = "Enregistrements récents";
@@ -363,6 +423,9 @@
 /* BandjeApp.swift | NL: Archief */
 "menu.file" = "Fichier";
 
+/* BandjeApp.swift | NL: Zoek… */
+"menu.find" = "Rechercher…";
+
 /* BandjeApp.swift | NL: Help */
 "menu.help" = "Help";
 
@@ -374,6 +437,9 @@
 
 /* BandjeApp.swift | NL: Verberg Band·je */
 "menu.hide" = "Masquer Band·je";
+
+/* BandjeApp.swift | NL: Markeer dit moment */
+"menu.mark" = "Marquer ce moment";
 
 /* BandjeApp.swift | NL: Microfoon */
 "menu.mic" = "Microphone";
@@ -507,20 +573,59 @@
 /* BandjeApp.swift | NL: Transcribeer */
 "panel.transcribe.prompt" = "Transcrire";
 
+/* Store.swift | NL: Blijf dicteren */
+"paywall.dictation.title" = "Continuer à dicter";
+
+/* Store.swift | NL: Je %@ gratis minuten dicteren zijn op. */
+"paywall.dictation.used" = "Vos %@ minutes de dictée gratuites sont utilisées.";
+
+/* Store.swift | NL: Opnemen blijft gratis, en wat je al hebt blijft van jou. */
+"paywall.line.free" = "L’enregistrement reste gratuit, et ce que vous avez déjà reste à vous.";
+
+/* Store.swift | NL: Eén keer betalen, geen abonnement. Alles blijft op je Mac. */
+"paywall.line.once" = "Un seul paiement, sans abonnement. Tout reste sur votre Mac.";
+
+/* Store.swift | NL: Transcribeer zoveel opnames als je wilt, en dicteer zonder limiet. */
+"paywall.line.unlimited" = "Transcrivez autant d’enregistrements que vous voulez, et dictez sans limite.";
+
+/* Store.swift | NL: Niet nu */
+"paywall.notNow" = "Pas maintenant";
+
+/* Store.swift | NL: Dicteren zonder limiet. */
+"paywall.offer.dictation" = "Dictée sans limite.";
+
+/* Store.swift | NL: Dicteren én transcriberen zonder limiet. */
+"paywall.offer.unlimited" = "Dictée et transcription sans limite.";
+
+/* Store.swift | NL: Transcriberen en dicteren zonder limiet. */
+"paywall.offer.unlimitedLong" = "Transcription et dictée sans limite.";
+
+/* Store.swift | NL: Wacht op goedkeuring. Band·je gaat verder zodra de aankoop rond is. */
+"paywall.pending" = "En attente d’approbation. Band·je reprend dès que l’achat est validé.";
+
+/* Store.swift | NL: Je %@ gratis transcripties zijn gebruikt. */
+"paywall.transcribe.used" = "Vos %@ transcriptions gratuites sont utilisées.";
+
 /* BandjeApp.swift | NL: Microfoon: Band·je hoort jou niet bij opnemen en dicteren. */
 "permcheck.mic" = "Micro : Band·je ne vous entend pas pendant l’enregistrement et la dictée.";
 
 /* BandjeApp.swift | NL: Open instellingen… */
 "permcheck.open" = "Ouvrir les réglages…";
 
-/* BandjeApp.swift | NL: Automatisch plakken: gedicteerde tekst staat op het klembord en je plakt zelf met ⌘V. */
-"permcheck.paste" = "Collage automatique : le texte dicté va dans le presse-papiers et vous le collez vous-même avec ⌘V.";
+/* BandjeApp.swift | NL: Geluid van je Mac: de andere kant van een gesprek komt niet in je opnames. */
+"permcheck.system" = "Son de votre Mac : l’autre côté d’un appel n’est pas dans vos enregistrements.";
 
 /* BandjeApp.swift | NL: Zet Band·je aan in Systeeminstellingen. In Instellingen zie je per toestemming wat er nodig is. */
 "permcheck.text" = "Activez Band·je dans Réglages Système. Réglages indique ce dont chaque autorisation a besoin.";
 
 /* BandjeApp.swift | NL: Band·je mist toestemming */
 "permcheck.title" = "Il manque une autorisation à Band·je";
+
+/* Playback.swift | NL: De audio kon niet uit iCloud worden opgehaald. */
+"player.failed.download" = "L’audio n’a pas pu être téléchargé depuis iCloud.";
+
+/* Playback.swift | NL: Deze audio kan niet worden afgespeeld. */
+"player.failed.play" = "Cet audio ne peut pas être lu.";
 
 /* WebExport.swift | NL: Transcript */
 "player.transcript" = "Transcription";
@@ -537,8 +642,14 @@
 /* BandjeApp.swift | NL: Band·je neemt op */
 "quit.recording.title" = "Band·je enregistre";
 
+/* BandjeApp.swift | NL: Schijf bijna vol: de opname stopt vanzelf bij minder dan 1 GB vrij. */
+"record.diskLow" = "Disque presque plein : l’enregistrement s’arrête de lui-même sous 1 Go libre.";
+
 /* BandjeApp.swift | NL: Kan de opnamemap %@ niet maken. Kies een andere map in Instellingen. */
 "record.folderFailed" = "Impossible de créer le dossier des enregistrements %@. Choisissez un autre dossier dans Réglages.";
+
+/* MainWindow.swift | NL: 1 markering */
+"record.markers.one" = "1 repère";
 
 /* BandjeApp.swift | NL: Opname niet gestart */
 "record.notStarted" = "Enregistrement non démarré";
@@ -648,11 +759,20 @@
 /* MainWindow.swift | NL: Geluid van je Mac */
 "settings.permissions.system" = "Son de votre Mac";
 
+/* Shortcuts.swift | NL: Band·je mag het geluid van je Mac niet opnemen: de andere kant van een gesprek ontbreekt dan in je opnames. Klik bij Geluid van je Mac op Open instellingen… en zet Band·je aan bij Scherm- en systeemaudio-opname. */
+"settings.permissions.system.denied" = "Band·je ne peut pas enregistrer le son de votre Mac : l’autre côté d’un appel manque alors dans vos enregistrements. Cliquez sur Ouvrir les réglages… à côté de Son de votre Mac et activez Band·je sous Enregistrement de l’écran et des sons du système.";
+
+/* Permissions.swift | NL: Net aangezet? Werkt het nog niet, dan herstart Band·je. */
+"settings.permissions.system.restart" = "Vous venez de l’activer ? Si cela ne fonctionne toujours pas, redémarrez Band·je.";
+
 /* Shortcuts.swift | NL: Sneltoetsen */
 "settings.shortcuts" = "Raccourcis clavier";
 
 /* Shortcuts.swift | NL: Algemeen */
 "settings.tab.general" = "Général";
+
+/* Shortcuts.swift | NL: Aankopen */
+"settings.tab.purchases" = "Achats";
 
 /* Shortcuts.swift | NL: Geluid */
 "settings.tab.sound" = "Son";
@@ -690,8 +810,41 @@
 /* WebExport.swift | NL: Hierbij de opname „%1$@” van %2$@. */
 "share.audio" = "Voici l’enregistrement « %1$@ » du %2$@.";
 
+/* RecordingView.swift | NL: Kopieer */
+"share.choose.copy" = "Copier";
+
+/* RecordingView.swift | NL: Afdrukken */
+"share.choose.print" = "Imprimer";
+
+/* RecordingView.swift | NL: Bewaar… */
+"share.choose.save" = "Enregistrer…";
+
+/* RecordingView.swift | NL: Deel */
+"share.choose.share" = "Partager";
+
+/* RecordingView.swift | NL: Wat wil je delen? */
+"share.choose.title" = "Que voulez-vous partager ?";
+
+/* RecordingView.swift | NL: Kopieer als */
+"share.choose.titleCopy" = "Copier en";
+
+/* RecordingView.swift | NL: Bewaar als */
+"share.choose.titleSave" = "Enregistrer sous";
+
+/* RecordingView.swift | NL: Deel als */
+"share.choose.titleShare" = "Partager en";
+
+/* RecordingView.swift | NL: Tekst */
+"share.format.text" = "Texte";
+
 /* WebExport.swift | NL: Opgenomen met %@ */
 "share.madeWith" = "Enregistré avec %@";
+
+/* WebExport.swift | NL: Hierbij de samenvatting van „%1$@” van %2$@. */
+"share.summary" = "Voici le résumé de « %1$@ » du %2$@.";
+
+/* WebExport.swift | NL: Hierbij de samenvatting en het transcript van „%1$@” van %2$@. */
+"share.summaryAndTranscript" = "Voici le résumé et la transcription de « %1$@ » du %2$@.";
 
 /* WebExport.swift | NL: Hierbij het transcript van „%1$@” van %2$@. */
 "share.transcript" = "Voici la transcription de « %1$@ » du %2$@.";
@@ -702,11 +855,17 @@
 /* Shortcuts.swift | NL: Dicteren */
 "shortcuts.dictate" = "Dictée";
 
-/* Shortcuts.swift | NL: Deze combinatie is al in gebruik voor de andere sneltoets. */
-"shortcuts.duplicate" = "Cette combinaison est déjà utilisée pour l’autre raccourci.";
+/* Shortcuts.swift | NL: Deze combinatie is al in gebruik voor een andere sneltoets. */
+"shortcuts.duplicate" = "Cette combinaison est déjà utilisée pour un autre raccourci.";
 
 /* Shortcuts.swift | NL: Klik op een sneltoets en druk de nieuwe combinatie, met ⌘, ⌃ of ⌥. Esc annuleert. */
 "shortcuts.hint" = "Cliquez sur un raccourci et tapez la nouvelle combinaison, avec ⌘, ⌃ ou ⌥. Échap annule.";
+
+/* Shortcuts.swift | NL: Markeer dit moment */
+"shortcuts.mark" = "Marquer ce moment";
+
+/* Shortcuts.swift | NL: Werkt tijdens een opname, en in het venster bij het luisteren. */
+"shortcuts.mark.note2" = "Fonctionne pendant un enregistrement, et dans la fenêtre pendant l’écoute.";
 
 /* Shortcuts.swift | NL: Gebruik ⌘, ⌃ of ⌥ in de combinatie. */
 "shortcuts.needModifier" = "Utilisez ⌘, ⌃ ou ⌥ dans la combinaison.";
@@ -729,11 +888,17 @@
 /* RecordingView.swift | NL: Sprekers benoemen */
 "speakers.title" = "Nommer les locuteurs";
 
-/* BandjeApp.swift | NL: Model laden… %@%% */
-"status.loadingPercent" = "Chargement du modèle… %@%%";
+/* BandjeApp.swift | NL: Alleen de eerste keer na installeren of bijwerken: dit duurt ongeveer een minuut. */
+"status.firstLoad" = "Seulement la première fois après l’installation ou une mise à jour : cela prend environ une minute.";
 
 /* BandjeApp.swift | NL: Transcriberen… %@%% */
 "status.progress" = "Transcription… %@%%";
+
+/* BandjeApp.swift | NL: Sprekers herkennen… %@%% */
+"status.speakersPercent" = "Reconnaissance des locuteurs… %@%%";
+
+/* BandjeApp.swift | NL: Spraakmodel voorbereiden… %@%% */
+"status.speechPercent" = "Préparation du modèle vocal… %@%%";
 
 /* BandjeApp.swift | NL: Samenvatten… */
 "status.summarizing" = "Résumé en cours…";
@@ -752,6 +917,78 @@
 
 /* Recorder.swift | NL: Audiocallback maken */
 "step.ioProc" = "Création du callback audio";
+
+/* Store.swift | NL: Koop voor %@ */
+"store.buyFor" = "Acheter pour %@";
+
+/* BandjeApp.swift | NL: Band·je Dicteren */
+"store.dictation" = "Band·je Dictée";
+
+/* Store.swift | NL: Nog %@ gratis minuten dicteren */
+"store.dictation.left" = "Encore %@ minutes de dictée gratuites";
+
+/* Store.swift | NL: Daarna kun je verder met %1$@ of %2$@, één keer betalen. */
+"store.dictation.warning" = "Ensuite, vous pouvez continuer avec %1$@ ou %2$@, en un seul paiement.";
+
+/* Store.swift | NL: Bekijk… */
+"store.dictation.warning.see" = "Voir…";
+
+/* Store.swift | NL: Eén keer betalen, geen abonnement. Opnemen blijft altijd gratis, en wat je al hebt blijft van jou. */
+"store.footer" = "Un seul paiement, sans abonnement. L’enregistrement reste toujours gratuit, et ce que vous avez déjà reste à vous.";
+
+/* Store.swift | NL: Nog %1$@ van %2$@ gratis transcripties */
+"store.left" = "Encore %1$@ transcriptions gratuites sur %2$@";
+
+/* Store.swift | NL: Prijs laden… */
+"store.loading" = "Chargement du prix…";
+
+/* BandjeApp.swift | NL: Wissel code in… */
+"store.redeem" = "Utiliser un code…";
+
+/* BandjeApp.swift | NL: Herstel aankopen */
+"store.restore" = "Restaurer les achats";
+
+/* Store.swift | NL: Aankopen hersteld */
+"store.restore.done" = "Achats restaurés";
+
+/* Store.swift | NL: Herstellen mislukt */
+"store.restore.failed" = "Échec de la restauration";
+
+/* Store.swift | NL: Geen aankopen gevonden */
+"store.restore.none" = "Aucun achat trouvé";
+
+/* Store.swift | NL: Dit Apple-account heeft Band·je Onbeperkt of Band·je Dicteren niet gekocht. */
+"store.restore.none.text" = "Ce compte Apple n’a pas acheté Band·je Illimité ni Band·je Dictée.";
+
+/* Store.swift | NL: %1$@ is hersteld. Onbeperkt transcriberen zit alleen in %2$@. */
+"store.restore.other" = "%1$@ a été restauré. La transcription illimitée n’est incluse que dans %2$@.";
+
+/* Store.swift | NL: Dicteren: nog %1$@ van %2$@ minuten. */
+"store.status.dictationFree" = "Dictée : encore %1$@ minutes sur %2$@.";
+
+/* Store.swift | NL: Dicteren is ontgrendeld. */
+"store.status.dictationUnlocked" = "La dictée est débloquée.";
+
+/* Store.swift | NL: Je kocht Band·je voordat het gratis werd: alles is ontgrendeld. */
+"store.status.existing" = "Vous avez acheté Band·je avant qu’il ne devienne gratuit : tout est débloqué.";
+
+/* Store.swift | NL: Gratis: nog %1$@ van %2$@ transcripties. */
+"store.status.free" = "Gratuit : encore %1$@ transcriptions sur %2$@.";
+
+/* Store.swift | NL: Alles is ontgrendeld. */
+"store.status.unknown" = "Tout est débloqué.";
+
+/* Store.swift | NL: Ontgrendeld. Dank je wel! */
+"store.status.unlocked" = "Débloqué. Merci !";
+
+/* BandjeApp.swift | NL: Band·je Onbeperkt */
+"store.unlimited" = "Band·je Illimité";
+
+/* Store.swift | NL: Ontgrendeld */
+"store.unlocked" = "Débloqué";
+
+/* Store.swift | NL: %@ gratis transcripties gebruikt · */
+"store.used" = "%@ transcriptions gratuites utilisées ·";
 
 /* Summarizer.swift | NL: Dit transcript bevat geen tekst om samen te vatten. */
 "summary.empty" = "Cette transcription ne contient aucun texte à résumer.";
@@ -798,6 +1035,15 @@
 /* Summarizer.swift | NL: Apple Intelligence ondersteunt de taal van dit gesprek (nog) niet. */
 "summary.unsupportedLanguageGeneric" = "Apple Intelligence ne prend pas (encore) en charge la langue de cette conversation.";
 
+/* BandjeApp.swift | NL: Ga door met alleen microfoon */
+"syswarn.continue" = "Continuer avec le micro seul";
+
+/* BandjeApp.swift | NL: macOS geeft Band·je geen toegang tot het geluid van je Mac. Deze opname heeft alleen je microfoon: de andere kant van een gesprek ontbreekt.\n\nZet Band·je aan bij Systeeminstellingen > Privacy en beveiliging > Scherm- en systeemaudio-opname en start de opname opnieuw. */
+"syswarn.text" = "macOS n’autorise pas Band·je à enregistrer le son de votre Mac. Cet enregistrement ne contient que votre micro : l’autre côté de l’appel manque.\n\nActivez Band·je dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système, puis relancez l’enregistrement.";
+
+/* BandjeApp.swift | NL: Het geluid van je Mac wordt niet opgenomen */
+"syswarn.title" = "Le son de votre Mac n’est pas enregistré";
+
 /* BandjeApp.swift | NL: Template niet gemaakt */
 "templates.newFailed" = "Modèle non créé";
 
@@ -831,17 +1077,35 @@
 /* TranscriptWriter.swift | NL: %@ is geen transcript van Band·je. */
 "transcript.unreadable" = "%@ n’est pas une transcription Band·je.";
 
-/* MainWindow.swift | NL: Toegang */
+/* Shortcuts.swift | NL: Toegang */
 "welcome.access" = "Accès";
 
 /* MainWindow.swift | NL: Sta toe… */
 "welcome.allow" = "Autoriser…";
 
-/* MainWindow.swift | NL: Blijf vrolijk, er komen gekke tijden aan! Zoek elkaar op en hou van je buren. */
-"welcome.cheer" = "Restez joyeux, des temps fous arrivent ! Retrouvez-vous et aimez vos voisins.";
+/* MainWindow.swift | NL: Terug */
+"welcome.back" = "Retour";
 
 /* MainWindow.swift | NL: Dicteren: praat, en de tekst komt waar je cursor staat. */
 "welcome.dictate" = "Dictée : parlez, et le texte apparaît là où se trouve votre curseur.";
+
+/* MainWindow.swift | NL: Dicteren: praat, en je tekst staat op het klembord. Plak hem met ⌘V waar je cursor staat. */
+"welcome.dictate.clipboard" = "Dictée : parlez, et votre texte est dans le presse-papiers. Collez-le avec ⌘V là où se trouve votre curseur.";
+
+/* MainWindow.swift | NL: Gratis beginnen */
+"welcome.free" = "Gratuit pour commencer";
+
+/* MainWindow.swift | NL: Opnemen is altijd gratis, en je eerste %1$@ transcripties krijg je van ons, alles op je Mac. %2$@ is ontgrendeld; onbeperkt transcriberen zit in %3$@: één keer betalen, geen abonnement. */
+"welcome.free.dictationOwned" = "L’enregistrement est toujours gratuit, et vos %1$@ premières transcriptions sont offertes, le tout sur votre Mac. %2$@ est débloqué ; la transcription illimitée est incluse dans %3$@ : un seul paiement, sans abonnement.";
+
+/* MainWindow.swift | NL: Al gekocht? Herstel aankopen */
+"welcome.free.restore" = "Déjà acheté ? Restaurer les achats";
+
+/* MainWindow.swift | NL: Opnemen is altijd gratis, en je eerste %1$@ transcripties en %2$@ minuten dicteren krijg je van ons, alles op je Mac. Daarna kies je %3$@ (alles) of %4$@: één keer betalen, geen abonnement. */
+"welcome.free.text" = "L’enregistrement est toujours gratuit, et vos %1$@ premières transcriptions et %2$@ minutes de dictée sont offertes, le tout sur votre Mac. Ensuite, choisissez %3$@ (tout) ou %4$@ : un seul paiement, sans abonnement.";
+
+/* MainWindow.swift | NL: Alles is ontgrendeld. Dank je wel! */
+"welcome.free.unlocked" = "Tout est débloqué. Merci !";
 
 /* MainWindow.swift | NL: Je opnames ook op je iPhone en je andere Macs, via iCloud Drive. Kan ook later, in Instellingen. */
 "welcome.icloud" = "Vos enregistrements aussi sur votre iPhone et vos autres Mac, via iCloud Drive. Possible aussi plus tard, dans Réglages.";
@@ -864,8 +1128,26 @@
 /* MainWindow.swift | NL: Om jou te horen bij opnemen en dicteren. */
 "welcome.mic" = "Pour vous entendre quand vous enregistrez et dictez.";
 
+/* MainWindow.swift | NL: Volgende */
+"welcome.next" = "Suivant";
+
+/* MainWindow.swift | NL: Optioneel */
+"welcome.optional" = "Facultatif";
+
+/* MainWindow.swift | NL: Band·je werkt volledig zonder. Zonder automatisch plakken staat gedicteerde tekst op het klembord en plak je zelf met ⌘V. */
+"welcome.optional.footer" = "Band·je fonctionne entièrement sans. Sans collage automatique, le texte dicté est dans le presse-papiers et vous le collez vous-même avec ⌘V.";
+
 /* MainWindow.swift | NL: Om gedicteerde tekst voor je te plakken (⌘V). Zonder staat de tekst op het klembord. */
 "welcome.paste" = "Pour coller le texte dicté à votre place (⌘V). Sinon, le texte est dans le presse-papiers.";
+
+/* MainWindow.swift | NL: Zet aan… */
+"welcome.paste.on" = "Activer…";
+
+/* MainWindow.swift | NL: Toegang */
+"welcome.permissions" = "Autorisations";
+
+/* MainWindow.swift | NL: Wat Band·je nodig heeft om op te nemen, te dicteren en te synchroniseren. */
+"welcome.permissions.intro" = "Ce dont Band·je a besoin pour enregistrer, dicter et synchroniser.";
 
 /* MainWindow.swift | NL: Alles blijft op je Mac, of in je eigen iCloud als je die aanzet. Verder gaat alleen een maandelijkse licentiecheck van het bedrijf achter het spraakmodel online, zonder audio of tekst. */
 "welcome.privacy" = "Tout reste sur votre Mac, ou dans votre propre iCloud si vous l’activez. Seule une vérification de licence mensuelle par l’entreprise derrière le modèle vocal passe par Internet, sans audio ni texte.";
@@ -882,11 +1164,11 @@
 /* MainWindow.swift | NL: Begin */
 "welcome.start" = "Commencer";
 
+/* MainWindow.swift | NL: Stap %1$@ van %2$@ */
+"welcome.step" = "Étape %1$@ sur %2$@";
+
 /* MainWindow.swift | NL: Om het geluid van je Mac op te nemen: de andere kant van een gesprek. */
 "welcome.system" = "Pour enregistrer le son de votre Mac : l’autre côté d’une conversation.";
-
-/* MainWindow.swift | NL: Bij eerste opname */
-"welcome.system.later" = "Au premier enregistrement";
 
 /* MainWindow.swift | NL: Welkom bij Bandje */
 "welcome.title" = "Bienvenue dans Bandje";
@@ -908,6 +1190,15 @@
 
 /* MainWindow.swift | NL: Band·je draait nog */
 "window.closed.title" = "Band·je est toujours ouvert";
+
+/* RecordingView.swift | NL: Kopieer */
+"window.copy" = "Copier";
+
+/* RecordingView.swift | NL: Kopieer alles */
+"window.copy.transcript" = "Tout copier";
+
+/* RecordingView.swift | NL: Kopieer */
+"window.copy.turn" = "Copier";
 
 /* MainWindow.swift | NL: Verwijder… */
 "window.delete" = "Supprimer…";
@@ -942,7 +1233,13 @@
 /* RecordingView.swift | NL: 15 seconden vooruit */
 "window.forward15" = "Avancer de 15 secondes";
 
-/* RecordingView.swift | NL: %@ markeringen */
+/* RecordingView.swift | NL: Zet een marker */
+"window.mark" = "Ajouter un repère";
+
+/* RecordingView.swift | NL: Zet een marker op deze plek (⌘D of %@) */
+"window.mark.help2" = "Ajouter un repère ici (⌘D ou %@)";
+
+/* MainWindow.swift | NL: %@ markeringen */
 "window.markers" = "%@ repères";
 
 /* RecordingView.swift | NL: Meer */
@@ -996,11 +1293,17 @@
 /* RecordingView.swift | NL: Audio… */
 "window.share.audio" = "Audio…";
 
-/* RecordingView.swift | NL: Transcript (.md)… */
-"window.share.md" = "Transcription (.md)…";
+/* RecordingView.swift | NL: Kopieer als… */
+"window.share.copyAs" = "Copier en…";
 
-/* RecordingView.swift | NL: Transcript als pdf… */
-"window.share.pdf" = "Transcription en PDF…";
+/* RecordingView.swift | NL: Afdrukken… */
+"window.share.print" = "Imprimer…";
+
+/* RecordingView.swift | NL: Bewaar als… */
+"window.share.saveAs" = "Enregistrer sous…";
+
+/* RecordingView.swift | NL: Deel als… */
+"window.share.shareAs" = "Partager en…";
 
 /* RecordingView.swift | NL: Toon in Finder */
 "window.showInFinder" = "Afficher dans le Finder";
@@ -1022,6 +1325,9 @@
 
 /* RecordingView.swift | NL: De taal wordt vanzelf herkend. Alles gebeurt op deze Mac. */
 "window.transcribe.hint" = "La langue est reconnue automatiquement. Tout se passe sur ce Mac.";
+
+/* RecordingView.swift | NL: Transcribeer opnieuw */
+"window.transcribeAgain" = "Transcrire à nouveau";
 
 /* MainWindow.swift | NL: Transcript */
 "window.transcript" = "Transcription";

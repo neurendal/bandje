@@ -17,12 +17,14 @@ final class DictationCapture: @unchecked Sendable {
     private let lock = NSLock()
     private var samples: [Float] = []
     private(set) var rate: Double = 0
+    /// Set on `queue`, read on the main thread: under `lock`.
+    private var _micName = "", _restarts = 0
     /// Name of the microphone used, for the "heard nothing" message.
-    private(set) var micName = ""
+    var micName: String { lock.withLock { _micName } }
     /// How often the engine was restarted because no audio came in (see `start`).
-    private(set) var restarts = 0
+    var restarts: Int { lock.withLock { _restarts } }
 
-    /// The microphone chosen at start; re-applied when the engine restarts.
+    /// The microphone chosen at start; re-applied when the engine restarts. Only used on `queue`.
     private var device: AudioObjectID = 0
     private var observer: NSObjectProtocol?
     private var stopped = false
@@ -45,7 +47,8 @@ final class DictationCapture: @unchecked Sendable {
         guard !released else { return } // released before the queue got to it
         // Same microphone as recordings (menu Microfoon). Must be set before the format is read.
         device = Recorder.inputDevice()
-        micName = Recorder.deviceName(device) ?? ""
+        let name = Recorder.deviceName(device) ?? ""
+        lock.withLock { _micName = name }
         try run()
         // Switching the engine to that microphone can reach Core Audio just after the start; the
         // engine then stops itself ("iounit configuration changed") and no audio comes in. Restart it.
@@ -70,8 +73,8 @@ final class DictationCapture: @unchecked Sendable {
         // The first rate wins; later buffers at another rate are converted to it (see append).
         if rate == 0 || samples.isEmpty { rate = format.sampleRate }
         let target = rate
+        samples.reserveCapacity(Int(target * 30))  // a tap of the previous run may still append
         lock.unlock()
-        samples.reserveCapacity(Int(target * 30))
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             self?.append(buffer, targetRate: target)
         }
@@ -85,10 +88,13 @@ final class DictationCapture: @unchecked Sendable {
     }
 
     private func restart() {
-        lock.lock(); let released = stopped; lock.unlock()
-        guard !released, restarts < 5 else { return }
-        restarts += 1
-        dictationLog.notice("capture: audio configuration changed, restarting the microphone (\(self.restarts, privacy: .public))")
+        let count: Int? = lock.withLock {
+            guard !stopped, _restarts < 5 else { return nil }
+            _restarts += 1
+            return _restarts
+        }
+        guard let count else { return }
+        dictationLog.notice("capture: audio configuration changed, restarting the microphone (\(count, privacy: .public))")
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         do {
@@ -159,10 +165,33 @@ final class DictationCapture: @unchecked Sendable {
     }
 }
 
-/// Puts dictated text on the clipboard and, with Accessibility permission, sends ⌘V to the
-/// frontmost app.
+/// Puts dictated text on the clipboard and, in a build from source with the permission to post key
+/// events (listed under Accessibility), sends ⌘V to the frontmost app.
+///
+/// The App Store build has no automatic pasting at all (App Review 2.4.5, rejected twice, last on
+/// 2026-11-19: a permission listed under Accessibility may only serve accessibility). No key events,
+/// no permission request, nothing about it in the interface: the text goes to the clipboard and the
+/// user pastes with ⌘V.
 @MainActor
 enum Paste {
+    enum Outcome: String { case pasted, clipboardOnly, notAllowed, secureInput }
+
+    #if APPSTORE
+    /// No automatic pasting in this build.
+    static let available = false
+    static var allowed: Bool { false }
+
+    /// Puts `text` on the clipboard. `.notAllowed` when the caller wanted it pasted, so it shows
+    /// the ⌘V hint.
+    static func deliver(_ text: String, paste: Bool) async -> Outcome {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        return paste ? .notAllowed : .clipboardOnly
+    }
+    #else
+    static let available = true
+
     /// Posting key events needs the "post event" permission (listed under Accessibility).
     /// `AXIsProcessTrusted` is the wrong check for a sandboxed app: its prompt never appears there.
     static var allowed: Bool { CGPreflightPostEventAccess() }
@@ -170,7 +199,7 @@ enum Paste {
     /// macOS answers `CGPreflightPostEventAccess` once per process: switching Bandje on in System
     /// Settings only shows (and works) after Bandje restarts. True once this launch asked for the
     /// permission, so the menu and settings can offer that restart.
-    @MainActor static var askedThisLaunch = false
+    static var askedThisLaunch = false
 
     /// Asks macOS for the permission (system dialog the first time, which adds Bandje to the
     /// Accessibility list) and opens that list in System Settings, where the user switches Bandje on.
@@ -182,9 +211,8 @@ enum Paste {
         }
     }
 
-    enum Outcome: String { case pasted, clipboardOnly, notAllowed, secureInput }
-
-    /// Puts `text` on the clipboard and, when allowed, sends ⌘V to the frontmost app.
+    /// Puts `text` on the clipboard. With `paste`, the permission and no secure input, also sends ⌘V
+    /// to the frontmost app once the modifier keys are up. Returns what happened.
     static func deliver(_ text: String, paste: Bool) async -> Outcome {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -218,4 +246,5 @@ enum Paste {
         dictationLog.notice("paste: ⌘V sent to \(app, privacy: .public) after waiting \(waited * 50) ms for modifiers")
         return .pasted
     }
+    #endif
 }

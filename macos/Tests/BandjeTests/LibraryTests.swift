@@ -1,4 +1,6 @@
+import AppKit
 import AVFoundation
+import BandjeKit
 import Foundation
 import PDFKit
 import Testing
@@ -66,9 +68,42 @@ final class LibraryTests {
         #expect(Library.scan(dir).first?.markers == [12.5, 40])
     }
 
-    /// The same speeds as on the iPhone.
+    /// The same speeds as on the iPhone (specs/player.md 5.3).
     @Test func playbackSpeeds() {
-        #expect(AudioPlayer.rates == [0.5, 0.75, 1, 1.25, 1.5, 2])
+        #expect(PlayerModel.rates == [0.5, 0.75, 1, 1.25, 1.5, 2])
+        #expect(PlayerModel.skipInterval == 15)
+    }
+
+    /// specs/player.md 3.3: positions are kept under `created` plus the length, so a rename (here,
+    /// in Finder or on the iPhone) keeps them.
+    @Test func playerIDSurvivesRename() throws {
+        let created = Date(timeIntervalSince1970: 1_800_000_000.4)
+        let folder = try recording("Overleg", date: created, transcript: "hallo")
+        let before = try #require(Library.scan(dir).first?.playable)
+        #expect(before.id == RecordingID(created: created, duration: 61))
+        #expect(before.title == "Overleg")
+        #expect(before.url.lastPathComponent == "Overleg.m4a")
+        _ = try Library.renameFolder(folder, to: "Gesprek met Jan")
+        let after = try #require(Library.scan(dir).first?.playable)
+        #expect(after.id == before.id)
+        #expect(after.title == "Gesprek met Jan")
+        #expect(after.url.lastPathComponent == "Gesprek met Jan.m4a")
+    }
+
+    /// A transcript without its audio has nothing to play.
+    @Test func noAudioNothingToPlay() {
+        let r = Recording(folder: dir.appendingPathComponent("x"), audio: nil, date: Date(), duration: 10)
+        #expect(r.playable == nil)
+    }
+
+    /// Space plays and pauses, ⌘← and ⌘→ skip (specs/player.md 5.1); other combinations pass through.
+    @Test func playerKeys() {
+        #expect(PlayerKey(keyCode: 49, modifiers: []) == .playPause)
+        #expect(PlayerKey(keyCode: 123, modifiers: [.command, .numericPad, .function]) == .back)
+        #expect(PlayerKey(keyCode: 124, modifiers: [.command, .numericPad, .function]) == .forward)
+        #expect(PlayerKey(keyCode: 49, modifiers: .command) == nil)
+        #expect(PlayerKey(keyCode: 123, modifiers: [.numericPad, .function]) == nil)
+        #expect(PlayerKey(keyCode: 124, modifiers: [.command, .shift]) == nil)
     }
 
     @Test func daysGroupTodayYesterdayAndDates() {
@@ -94,26 +129,6 @@ final class LibraryTests {
         #expect(await library.search("BUDGET").map(\.title) == ["Overleg Jan"])
         #expect(await library.search("").count == 2)
         #expect(await library.preview(for: library.recordings.first { $0.title == "Overleg Jan" }!) == "budget voor volgend jaar")
-    }
-
-    @Test func audioPlayerLoadsAndSeeks() async throws {
-        let url = dir.appendingPathComponent("tone.wav")
-        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
-        do {  // the file gets its length when it is closed
-            let file = try AVAudioFile(forWriting: url, settings: format.settings)
-            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32_000)!
-            buffer.frameLength = 32_000
-            try file.write(from: buffer)
-        }
-        let player = await AudioPlayer()
-        try await player.load(url)
-        #expect(abs(await player.duration - 2) < 0.05)
-        await player.seek(1)
-        #expect(abs(await player.time - 1) < 0.05)
-        await player.seek(5)                     // past the end: clamped
-        #expect(abs(await player.time - 2) < 0.05)
-        let loaded = await player.url, playing = await player.isPlaying
-        #expect(loaded == url && !playing)
     }
 
     @Test func compactAudioIsMonoSpeechQuality() async throws {
@@ -180,6 +195,22 @@ final class LibraryTests {
         #expect(try TranscriptWriter.read(json: ready.appendingPathComponent("Opname 6 nov 14.32 2.json")).audioFile == "Opname 6 nov 14.32 2.m4a")
     }
 
+    @Test func moveLocalIntoATakenNameRenamesTheFilesToo() throws {
+        let staging = dir.appendingPathComponent("staging"), local = dir.appendingPathComponent("local")
+        let folder = try recording("Opname 6 nov 14.32", date: Date(), transcript: "hoi")
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        let staged = staging.appendingPathComponent(folder.lastPathComponent)
+        try FileManager.default.moveItem(at: folder, to: staged)
+        try FileManager.default.createDirectory(at: local.appendingPathComponent("Opname 6 nov 14.32"), withIntermediateDirectories: true)
+        let moved = try ICloudSync.moveLocal(staged, into: local)
+        #expect(moved.lastPathComponent == "Opname 6 nov 14.32 2")
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+        let files = try FileManager.default.contentsOfDirectory(atPath: moved.path)
+        #expect(files.contains("Opname 6 nov 14.32 2.m4a") && files.contains("Opname 6 nov 14.32 2.json"))
+        #expect(!files.contains { $0.hasPrefix("Opname 6 nov 14.32.") })
+        #expect(try TranscriptWriter.read(json: moved.appendingPathComponent("Opname 6 nov 14.32 2.json")).audioFile == "Opname 6 nov 14.32 2.m4a")
+    }
+
     @Test func copyIntoATakenNameRenamesTheFilesToo() async throws {
         let target = dir.appendingPathComponent("local")
         let folder = try recording("Memo", date: Date(), transcript: "hoi")
@@ -200,6 +231,41 @@ final class LibraryTests {
         await #expect(throws: (any Error).self) { _ = try await library.rename(r, to: "Nieuw") }
         await #expect(throws: (any Error).self) { try await library.delete(r) }
         #expect(FileManager.default.fileExists(atPath: folder.path))
+    }
+
+    // MARK: Recordings not in iCloud yet (owner, 2026-11-09)
+
+    /// A finished recording that could not move into iCloud stays in the staging folder and shows in
+    /// the library from there; one still being recorded (or not converted yet) does not.
+    @Test func stagingRecordingsShowUntilTheyMove() async throws {
+        let cloud = dir.appendingPathComponent("cloud"), staging = dir.appendingPathComponent("staging")
+        try FileManager.default.createDirectory(at: cloud, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        func make(_ name: String, in parent: URL, recording: Bool? = nil, caf: Bool = false) throws -> URL {
+            let f = parent.appendingPathComponent(name)
+            try FileManager.default.createDirectory(at: f, withIntermediateDirectories: true)
+            try RecordingMeta(created: Date(timeIntervalSince1970: Double(name.count) * 1_000), recording: recording).write(to: f)
+            FileManager.default.createFile(atPath: f.appendingPathComponent("\(name).\(caf ? "caf" : "m4a")").path, contents: Data([0]))
+            return f
+        }
+        _ = try make("In iCloud", in: cloud)
+        let waiting = try make("Wacht op iCloud", in: staging)
+        _ = try make("Neemt op", in: staging, recording: true, caf: true)
+        #expect(Set(Library.scan(cloud, staging: staging).map(\.title)) == ["In iCloud", "Wacht op iCloud"])
+        #expect(Library.scan(cloud).map(\.title) == ["In iCloud"])
+
+        let library = await Library(root: { cloud }, staging: staging)
+        await library.refresh()
+        // Rename works where it is (delete is the same move to the Trash as for any folder).
+        let r = try #require(await library.recordings.first { $0.folder.standardizedFileURL == waiting.standardizedFileURL })
+        let renamed = try await library.rename(r, to: "Nieuwe naam")
+        #expect(renamed.folder.deletingLastPathComponent().standardizedFileURL == staging.standardizedFileURL)
+        #expect(FileManager.default.fileExists(atPath: renamed.folder.appendingPathComponent("Nieuwe naam.m4a").path))
+        // Moved into iCloud later: shown once, from there.
+        try FileManager.default.moveItem(at: renamed.folder, to: cloud.appendingPathComponent("Nieuwe naam"))
+        await library.refresh()
+        #expect(await library.recordings.map(\.title).sorted() == ["In iCloud", "Nieuwe naam"])
+        #expect(await library.recordings.allSatisfy { $0.folder.deletingLastPathComponent().standardizedFileURL == cloud.standardizedFileURL })
     }
 
     @Test func renameMovesFolderAndEveryFileWithTheName() async throws {
@@ -240,22 +306,22 @@ final class LibraryTests {
     @MainActor @Test func coverIsEmbeddedOnceAndRemadeForANewTitleOrColour() async throws {
         let audio = try m4a("Planning")
         let folder = audio.deletingLastPathComponent()
-        await CoverArt.embed(in: folder)
+        await CoverArt.embed(in: folder, own: false)  // no cover yet: made, also when not our change
         let first = try #require(try await embeddedCover(audio))
         #expect(first.count > 20_000)
         let key = CoverArt.key(title: "Planning", duration: 3, color: .red)
         #expect(RecordingMeta.read(from: folder)?.coverKey == key)
         #expect(CoverArt.existing(in: folder)?.lastPathComponent == ".cover-\(key).jpg")
-        #expect(abs(Library.duration(transcript: nil, audio: audio) - 3) < 0.05)  // not re-encoded
+        #expect(abs(Library.duration(audio: audio, meta: nil, transcript: nil) - 3) < 0.05)  // not re-encoded
 
         // Unchanged: the file is left alone.
         let modified = try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        await CoverArt.embed(in: folder)
+        await CoverArt.embed(in: folder, own: true)
         #expect(try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
 
         // Another colour: a new cover, in the file and next to it (the old one removed).
         try Library.setColor(.green, in: folder)
-        await CoverArt.embed(in: folder)
+        await CoverArt.embed(in: folder, own: true)
         let green = try #require(try await embeddedCover(audio))
         #expect(green != first)
         #expect(RecordingMeta.read(from: folder)?.coverKey == CoverArt.key(title: "Planning", duration: 3, color: .green))
@@ -263,7 +329,7 @@ final class LibraryTests {
         // Renamed: the sticker's title changes, so the cover too.
         let renamed = try Library.renameFolder(folder, to: "Overleg")
         let renamedAudio = try #require(Library.audioFile(in: renamed))
-        await CoverArt.embed(in: renamed)
+        await CoverArt.embed(in: renamed, own: true)
         #expect(try await embeddedCover(renamedAudio) != green)
         // For a look at the artwork: build/cover-art.jpg.
         try? await embeddedCover(renamedAudio)?.write(to: URL(fileURLWithPath: #filePath)
@@ -271,6 +337,190 @@ final class LibraryTests {
         #expect(RecordingMeta.read(from: renamed)?.coverKey == CoverArt.key(title: "Overleg", duration: 3, color: .green))
         let files = try FileManager.default.contentsOfDirectory(atPath: renamed.path)
         #expect(files.filter { $0.hasPrefix(".cover-") }.count == 1 && !files.contains { $0.hasPrefix(".embedding-") })
+    }
+
+    /// Rename and colour at once (here, in the rename sheet, or arriving from the iPhone): the rename
+    /// starts a new cover, and the colour lands in `.bandje.json` while that cover is being written
+    /// into the audio. Writing the cover's key must not put back the colour it read before.
+    @MainActor @Test func coverDoesNotUndoAColourChangedWhileItIsMade() async throws {
+        var caught = false
+        for attempt in 0..<5 where !caught {
+            let audio = try m4a("Race \(attempt)")
+            let folder = audio.deletingLastPathComponent()
+            let json: [String: Any] = ["created": "2026-11-10T10:00:00Z", "markers": [], "futureKey": "kept"]
+            try JSONSerialization.data(withJSONObject: json).write(to: RecordingMeta.url(in: folder))
+            let embedding = Task { @MainActor in await CoverArt.embed(in: folder, own: true) }
+            // The cover's jpg is written just before the audio is: from then until the key is in
+            // `.bandje.json`, the cover is being made. Change the colour in that window (on the main
+            // actor, without suspending, so the cover cannot finish in between).
+            for _ in 0..<2_000 {
+                let started = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).contains { $0.hasPrefix(".cover-") }
+                if started, RecordingMeta.read(from: folder)?.coverKey == nil {
+                    try Library.setColor(.blue, in: folder)
+                    caught = true
+                    break
+                }
+                if RecordingMeta.read(from: folder)?.coverKey != nil { break }  // missed the window: again
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            await embedding.value
+            guard caught else { continue }
+            let meta = try #require(RecordingMeta.read(from: folder))
+            #expect(meta.color == TapeColor.blue.stored)
+            #expect(meta.coverKey == CoverArt.key(title: folder.lastPathComponent, duration: 3, color: .red))
+            let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: RecordingMeta.url(in: folder))) as? [String: Any]
+            #expect(raw?["futureKey"] as? String == "kept")
+            // The next round makes the blue cover.
+            await CoverArt.embed(in: folder, own: true)
+            #expect(RecordingMeta.read(from: folder)?.color == TapeColor.blue.stored)
+            #expect(RecordingMeta.read(from: folder)?.coverKey == CoverArt.key(title: folder.lastPathComponent, duration: 3, color: .blue))
+        }
+        #expect(caught, "never changed the colour while the cover was being made")
+    }
+
+    /// A rename or colour from the iPhone (owner, 2026-11-10): the iPhone writes that cover. This Mac
+    /// leaves the audio and `.bandje.json` alone; when it reacted, its write (of a `.bandje.json` that
+    /// may not have the iPhone's colour yet) won in iCloud and the colour flipped back on both.
+    @MainActor @Test func coverIsNotRemadeForAChangeFromTheIPhone() async throws {
+        let audio = try m4a("Van de iPhone")
+        let folder = audio.deletingLastPathComponent()
+        await CoverArt.embed(in: folder, own: false)
+        let key = CoverArt.key(title: "Van de iPhone", duration: 3, color: .red)
+        #expect(RecordingMeta.read(from: folder)?.coverKey == key)
+
+        // The colour arrives in `.bandje.json`, then the folder's new name.
+        try RecordingMeta.update(in: folder) { $0["color"] = "green"; return true }
+        let renamed = try Library.renameFolder(folder, to: "Hernoemd op de iPhone")
+        let renamedAudio = try #require(Library.audioFile(in: renamed))
+        let modified = try renamedAudio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        let before = try Data(contentsOf: RecordingMeta.url(in: renamed))
+        await CoverArt.embed(in: renamed, own: false)
+        #expect(try renamedAudio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+        #expect(try Data(contentsOf: RecordingMeta.url(in: renamed)) == before)
+        #expect(RecordingMeta.read(from: renamed)?.color == "green")
+    }
+
+    /// The library makes covers for this Mac's own renames and colours, and for recordings without
+    /// one; a colour that arrives from the iPhone gets none here.
+    @MainActor @Test func libraryMakesCoversOnlyForOwnChanges() async throws {
+        let audio = try m4a("Bibliotheek")
+        let folder = audio.deletingLastPathComponent()
+        let root = folder.deletingLastPathComponent()
+        let library = Library(root: { root })
+        func waitForKey(_ key: String, in folder: URL) async throws -> Bool {
+            for _ in 0..<200 {
+                if RecordingMeta.read(from: folder)?.coverKey == key { return true }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            return false
+        }
+        await library.refresh()
+        #expect(try await waitForKey(CoverArt.key(title: "Bibliotheek", duration: 3, color: .red), in: folder))
+
+        // From the iPhone: a colour. A refresh, and time for a cover round: none.
+        try RecordingMeta.update(in: folder) { $0["color"] = "green"; return true }
+        let modified = try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        await library.refresh()
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+        #expect(RecordingMeta.read(from: folder)?.coverKey == CoverArt.key(title: "Bibliotheek", duration: 3, color: .red))
+
+        // Here: a new name and colour, as the rename sheet does it.
+        let recording = try #require(library.recordings.first)
+        let renamed = try await library.rename(recording, to: "Eigen naam")
+        try await library.setColor(.blue, of: renamed)
+        #expect(try await waitForKey(CoverArt.key(title: "Eigen naam", duration: 3, color: .blue), in: renamed.folder))
+        #expect(RecordingMeta.read(from: renamed.folder)?.color == "blue")
+    }
+
+    // MARK: The length in `.bandje.json` (specs/icloud-sync.md)
+
+    /// The length: the audio's own when it is here, else `.bandje.json`'s, else the transcript's, else 0.
+    @Test func durationReadOrder() throws {
+        let audio = try m4a("Lengte")  // 3 s
+        let folder = audio.deletingLastPathComponent()
+        let transcript = folder.appendingPathComponent("Lengte.json")
+        try Data(#"{"duration": 61, "segments": []}"#.utf8).write(to: transcript)
+        var meta = RecordingMeta(created: Date(timeIntervalSince1970: 5))
+        meta.duration = 42.5
+        #expect(abs(Library.duration(audio: audio, meta: meta, transcript: transcript) - 3) < 0.05)
+        // Audio not here (or not readable): the hint, then the transcript, then 0.
+        let missing = folder.appendingPathComponent("weg.m4a")
+        #expect(Library.duration(audio: missing, meta: meta, transcript: transcript) == 42.5)
+        #expect(Library.duration(audio: nil, meta: meta, transcript: transcript) == 42.5)
+        #expect(Library.duration(audio: nil, meta: RecordingMeta(created: Date()), transcript: transcript) == 61)
+        #expect(Library.duration(audio: nil, meta: nil, transcript: nil) == 0)
+        try meta.write(to: folder)
+        try FileManager.default.removeItem(at: audio)
+        #expect(Library.scan(dir).first?.duration == 42.5)
+    }
+
+    /// Positions stay under the same `RecordingID`: the stored length (0.1 s, rounded down) rounds to
+    /// the same whole second as the audio's own length, also at x.45 and x.5.
+    @Test func storedDurationRoundsLikeTheAudio() {
+        for seconds in [312.46, 312.45, 312.5, 312.54, 312.99, 0.96, 3.0, 3599.95, 7.049999999, 12.4999999999] {
+            let stored = try! #require(RecordingMeta.storedDuration(seconds))
+            #expect(Int(stored.rounded()) == Int(seconds.rounded()), "\(seconds) → \(stored)")
+            #expect(stored <= seconds && seconds - stored < 0.1 + 1e-9)
+            #expect(RecordingID(created: Date(timeIntervalSince1970: 9), duration: stored)
+                    == RecordingID(created: Date(timeIntervalSince1970: 9), duration: seconds))
+        }
+        #expect(RecordingMeta.storedDuration(0) == nil)
+        #expect(RecordingMeta.storedDuration(0.04) == nil)
+        #expect(RecordingMeta.storedDuration(.nan) == nil)
+    }
+
+    /// `duration` is written as 312.4 (not 312.39999999999998), like the markers, and every key this
+    /// version doesn't know stays.
+    @Test func durationIsWrittenWithOneDecimalAndOtherKeysStay() throws {
+        let folder = dir.appendingPathComponent("Sleutels")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(#"{"created": "2026-11-09T10:00:00Z", "markers": [1.5], "conversionAttempts": 2, "future": {"a": 1}}"#.utf8)
+            .write(to: RecordingMeta.url(in: folder))
+        var meta = try #require(RecordingMeta.read(from: folder))
+        meta.setDuration(312.46)
+        meta.markers = [312.4, 0.1]
+        try meta.write(to: folder)
+        let text = try String(contentsOf: RecordingMeta.url(in: folder), encoding: .utf8)
+        #expect(text.contains(#""duration" : 312.4,"#) || text.contains(#""duration" : 312.4\#n"#))
+        #expect(!text.contains("312.39999") && !text.contains("0.10000"))
+        #expect(text.contains(#""conversionAttempts" : 2"#) && text.contains(#""future""#))
+        #expect(RecordingMeta.read(from: folder)?.duration == 312.4)
+        #expect(RecordingMeta.read(from: folder)?.markers == [312.4, 0.1])
+        // A file without it (or with something odd in it) still reads.
+        try Data(#"{"created": "2026-11-09T10:00:00Z", "duration": "lang"}"#.utf8).write(to: RecordingMeta.url(in: folder))
+        #expect(RecordingMeta.read(from: folder)?.duration == nil)
+    }
+
+    /// Older recordings get the length filled in when their audio is here: only that key changes,
+    /// never in a recording in progress, never without `.bandje.json`, never over a length that is there.
+    @Test func backfillWritesOnlyTheLength() throws {
+        let audio = try m4a("Oud")
+        let folder = audio.deletingLastPathComponent()
+        try Data(#"{"created": "2026-11-09T10:00:00Z", "markers": [2.5], "color": "green", "future": true}"#.utf8)
+            .write(to: RecordingMeta.url(in: folder))
+        let busy = try m4a("Bezig")
+        try RecordingMeta(created: Date(), recording: true).write(to: busy.deletingLastPathComponent())
+        _ = try m4a("Zonder")  // no .bandje.json
+        let found = Library.scan(dir)
+        #expect(Library.backfillDurations(found).map(\.lastPathComponent) == ["Oud"])
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: RecordingMeta.url(in: folder))) as? [String: Any])
+        #expect((object["duration"] as? Double).map { abs($0 - 3) < 0.05 } == true)
+        #expect(object["color"] as? String == "green" && object["future"] as? Bool == true && object["markers"] as? [Double] == [2.5])
+        #expect(RecordingMeta.read(from: busy.deletingLastPathComponent())?.duration == nil)
+        #expect(!FileManager.default.fileExists(atPath: RecordingMeta.url(in: dir.appendingPathComponent("Zonder")).path))
+        #expect(Library.backfillDurations(Library.scan(dir)).isEmpty)  // once
+    }
+
+    /// Finishing a recording (stop, crash recovery, quitting while recording) writes its length.
+    @Test func finishingWritesTheLength() throws {
+        let audio = try m4a("Klaar")
+        let folder = audio.deletingLastPathComponent()
+        try RecordingMeta(created: Date(timeIntervalSince1970: 7), recording: true).write(to: folder)
+        OutputLocation.finishMeta(folder)
+        let meta = try #require(RecordingMeta.read(from: folder))
+        #expect(meta.recording == nil)
+        #expect(meta.duration.map { abs($0 - 3) < 0.05 } == true)
     }
 
     /// The iPhone writes the same key for the same recording, so neither redoes the other's cover
@@ -367,9 +617,30 @@ final class LibraryTests {
     #expect(L.showWelcome(firstLaunch: false, updated: true, permissionMissing: true))
     #expect(!L.showWelcome(firstLaunch: false, updated: true, permissionMissing: false))
     #expect(!L.showWelcome(firstLaunch: false, updated: false, permissionMissing: true))
+    // The first time from the start; after an update (a permission missing) straight to Access.
+    #expect(L.welcomeStep(firstLaunch: true) == 1)
+    #expect(L.welcomeStep(firstLaunch: false) == 2)
     #expect(L.updated(lastBuild: "20261105.2303", build: "20261106.2057"))
     #expect(!L.updated(lastBuild: nil, build: "20261106.2057"))
     #expect(!L.updated(lastBuild: "20261106.2057", build: "20261106.2057"))
+}
+
+/// The welcome's Free to Start names only what the App Store confirmed: while it isn't known yet
+/// whether this is an existing customer (everything unlocked meanwhile), it never says that
+/// Band·je Dictation is unlocked.
+@Test func welcomeFreeNamesOnlyKnownPurchases() {
+    func free(_ o: Purchases.Override?, unlimited: Bool = false, dictation: Bool = false, existing: Bool?) -> Store.WelcomeFree {
+        let k = Store.known(override: o, ownsUnlimited: unlimited, ownsDictation: dictation, existingCustomer: existing)
+        return Store.welcomeFree(knowsUnlimited: k.unlimited, knowsDictation: k.dictation)
+    }
+    #expect(free(nil, existing: nil) == .free)
+    #expect(free(nil, existing: false) == .free)
+    #expect(free(nil, existing: true) == .unlocked)
+    #expect(free(nil, dictation: true, existing: nil) == .dictationOwned)
+    #expect(free(nil, unlimited: true, existing: false) == .unlocked)
+    #expect(free(.dictation, existing: nil) == .dictationOwned)
+    #expect(free(.existing, existing: nil) == .unlocked)
+    #expect(free(.used, existing: nil) == .free)
 }
 
 /// Closing the window: a message that Band·je keeps running in the menu bar, until the user ticks

@@ -150,6 +150,107 @@ struct ImportTests {
         #expect(again.imported.isEmpty && again.errors.isEmpty)
     }
 
+    /// Rename and colour together (iCloud, owner 2026-11-10): the rename starts a new cover, and the
+    /// colour is written while that export runs. Noting the cover's key afterwards must not put the
+    /// `.bandje.json` read before the export back (the colour flipped back, also on the other device).
+    @Test func coverKeyDoesNotUndoAColourSetDuringTheExport() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let audio = dir.appending(path: "import_nl.m4a")
+        try FileManager.default.copyItem(at: try fixture("import_nl.m4a"), to: audio)
+        let created = Date(timeIntervalSince1970: 1_800_000_000)
+        try RecordingMeta(created: created, markers: [1.5]).write(to: dir)
+        // A key a newer version wrote: kept.
+        let url = RecordingMeta.url(in: dir)
+        var json = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        json["future"] = "kept"
+        try JSONSerialization.data(withJSONObject: json).write(to: url)
+
+        let recording = Recording(folder: dir, audio: audio, date: created, duration: 30, markers: [1.5])
+        await AudioExport.embedCover(recording, own: true) {
+            var meta = RecordingMeta.read(from: dir)!
+            meta.color = TapeColor.blue.stored
+            try? meta.write(to: dir)
+        }
+        let meta = try #require(RecordingMeta.read(from: dir))
+        #expect(meta.color == "blue")
+        #expect(meta.coverKey == CoverArt.key(for: recording))
+        #expect(meta.markers == [1.5])
+        let after = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        #expect(after["future"] as? String == "kept")
+    }
+
+    /// A rename or colour from the Mac (owner, 2026-11-10): the Mac writes that cover. The iPhone
+    /// leaves the audio and `.bandje.json` alone; when it reacted, its write (of a `.bandje.json`
+    /// that did not have the Mac's colour yet) won in iCloud and the colour flipped back on both.
+    @Test func coverIsNotRemadeForAChangeFromTheMac() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let audio = dir.appending(path: "import_nl.m4a")
+        try FileManager.default.copyItem(at: try fixture("import_nl.m4a"), to: audio)
+        let created = Date(timeIntervalSince1970: 1_800_000_000)
+        let recording = Recording(folder: dir, audio: audio, date: created, duration: 30, markers: [])
+        await AudioExport.embedCover(recording, own: false)
+        #expect(RecordingMeta.read(from: dir)?.coverKey == CoverArt.key(for: recording))
+
+        // The Mac's colour arrives; the library sees it.
+        try RecordingMeta.update(in: dir, created: created) { $0.color = TapeColor.green.stored }
+        var fromMac = recording
+        fromMac.color = .green
+        let modified = try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        let before = try Data(contentsOf: RecordingMeta.url(in: dir))
+        await AudioExport.embedCover(fromMac, own: false)
+        #expect(try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+        #expect(try Data(contentsOf: RecordingMeta.url(in: dir)) == before)
+        // The same colour chosen here: the cover is made.
+        await AudioExport.embedCover(fromMac, own: true)
+        #expect(RecordingMeta.read(from: dir)?.coverKey == CoverArt.key(for: fromMac))
+        #expect(RecordingMeta.read(from: dir)?.color == "green")
+    }
+
+    /// Renamed or recoloured here while the audio is still in iCloud: the cover in the audio is old,
+    /// so the key goes (a device with the audio makes the cover); other keys stay. Not our change:
+    /// nothing.
+    @Test func ownChangeWithTheAudioInICloudRemovesTheKey() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let folder = dir.appending(path: "Talk", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data().write(to: folder.appending(path: ".Talk.m4a.icloud"))
+        let created = Date(timeIntervalSince1970: 1_800_000_000)
+        var meta = RecordingMeta(created: created, markers: [2.5])
+        meta.coverKey = "old"
+        meta.color = TapeColor.blue.stored
+        try meta.write(to: folder)
+        let recording = try #require(Storage.scan(dir).first)
+        #expect(!recording.audioIsLocal)
+
+        await AudioExport.embedCover(recording, own: false)
+        #expect(RecordingMeta.read(from: folder)?.coverKey == "old")
+        await AudioExport.embedCover(recording, own: true)
+        let after = try #require(RecordingMeta.read(from: folder))
+        #expect(after.coverKey == nil)
+        #expect(after.color == "blue" && after.markers == [2.5] && after.created == created)
+    }
+
+    /// `.bandje.json` still in iCloud (a placeholder here): never a new one over it, not even for an
+    /// own change; the audio is left alone too.
+    @Test func coverWaitsForBandjeJSONFromICloud() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let audio = dir.appending(path: "import_nl.m4a")
+        try FileManager.default.copyItem(at: try fixture("import_nl.m4a"), to: audio)
+        try Data().write(to: dir.appending(path: "..bandje.json.icloud"))
+        let recording = Recording(folder: dir, audio: audio, date: .now, duration: 30, markers: [])
+        let modified = try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        await AudioExport.embedCover(recording, own: true)
+        await AudioExport.embedCover(recording, own: false)
+        #expect(!FileManager.default.fileExists(atPath: RecordingMeta.url(in: dir).path))
+        #expect(try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+        #expect(await CoverArt.file(for: recording) == nil)
+        #expect(try RecordingMeta.fillIn(duration: 30, in: dir) == false)
+    }
+
     @Test func coverIsEmbeddedInTheRecordingOnce() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -157,7 +258,7 @@ struct ImportTests {
         try FileManager.default.copyItem(at: try fixture("import_nl.m4a"), to: audio)
         let recording = Recording(folder: dir, audio: audio, date: .now, duration: 30, markers: [])
         let before = try await AVURLAsset(url: audio).load(.duration).seconds
-        await AudioExport.embedCover(recording)
+        await AudioExport.embedCover(recording, own: false)  // no cover yet: made, also when not our change
         let metadata = try await AVURLAsset(url: audio).load(.metadata)
         let data = try await metadata.first { $0.identifier == .iTunesMetadataCoverArt }?.load(.dataValue)
         #expect((data?.count ?? 0) > 20_000)
@@ -168,7 +269,7 @@ struct ImportTests {
         #expect(abs(before - after) < 0.05)
         #expect(RecordingMeta.read(from: dir)?.coverKey == CoverArt.key(title: recording.title, duration: 30))
         let modified = try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        await AudioExport.embedCover(recording)
+        await AudioExport.embedCover(recording, own: true)
         #expect(try audio.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
         let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
         #expect(files.filter { $0.hasPrefix(".cover-") }.count == 1 && !files.contains { $0.hasPrefix(".embedding-") })
@@ -179,7 +280,7 @@ struct ImportTests {
         let oldCover = try #require(await CoverArt.file(for: recording))
         let newCover = try #require(await CoverArt.file(for: renamed))
         #expect(oldCover != newCover && !FileManager.default.fileExists(atPath: oldCover.path))
-        await AudioExport.embedCover(renamed)
+        await AudioExport.embedCover(renamed, own: true)
         #expect(RecordingMeta.read(from: dir)?.coverKey == CoverArt.key(for: renamed))
         let embedded = try await AVURLAsset(url: audio).load(.metadata).first { $0.identifier == .iTunesMetadataCoverArt }?.load(.dataValue)
         #expect(embedded == (try Data(contentsOf: newCover)))

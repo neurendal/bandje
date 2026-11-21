@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import BandjeKit
 import SwiftUI
 
 /// Settings and about (SPEC 3.4): version, settings, privacy, phone calls, the Desert Ant Labs
-/// attribution with the model licences (CLAUDE.md 6, texts from the Mac `About.swift`), and the
-/// three links. These links are the only URLs in our code; they open the browser.
+/// attribution with the model licences (texts from the Mac `About.swift`), and the
+/// links. These links are the only URLs in our code; they open the browser.
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("autoTranscribe") private var autoTranscribe = false
@@ -12,9 +13,15 @@ struct AboutView: View {
     private var sync = CloudSync.shared
 
     private static let neurendal = URL(string: "https://neurendal.com")!
-    private static let website = URL(string: "https://band.je")!
-    private static let support = URL(string: "https://band.je/support")!
-    private static let privacy = URL(string: "https://band.je/privacy")!
+    // band.je pages in the app's language (English at the root, the others under /nl/ and so on).
+    private static let website = site("/")
+    private static let support = site("/support/")
+    private static let phoneCallTips = site("/support/", fragment: "phone-calls")
+    private static let privacy = site("/privacy/")
+
+    static func site(_ page: String, fragment: String? = nil, localization: String? = Bundle.main.preferredLocalizations.first) -> URL {
+        URL(string: "https://band.je" + SitePath.path(page, fragment: fragment, localization: localization))!
+    }
 
     private var version: String {
         let info = Bundle.main.infoDictionary ?? [:]
@@ -71,7 +78,8 @@ struct AboutView: View {
                         }
                     }
                     .tint(.green)
-                    .disabled(!sync.isAvailable || sync.isBusy)
+                    // Turning on moves the recordings: not while a transcription or summary writes into one.
+                    .disabled(!sync.isAvailable || sync.isBusy || (!sync.isOn && CloudSync.jobsRunning))
                     .accessibilityIdentifier("iCloudToggle")
                     if let error = sync.errorMessage {
                         Text(error).font(.footnote).foregroundStyle(.red)
@@ -123,13 +131,22 @@ struct AboutView: View {
 
                 if Device.name == "iPhone" {
                     Section("Phone calls") {
-                        Text("Phone call? Record it with the button in the Phone app, then share the recording from Notes to Bandje.")
+                        // Call recording is not available everywhere (not in the EU, owner 12 Nov).
+                        Text("Phone call? Where the Phone app can record calls, tap its record button, then share the recording from Notes to Band·je. Not every country has this, the EU for example.")
                             .font(.subheadline)
+                        Link(destination: Self.phoneCallTips) {
+                            Label("Tips for recording phone calls", systemImage: "lightbulb")
+                        }
+                        .accessibilityIdentifier("phoneCallTipsLink")
                     }
                 }
 
+                // Above the credits (owner, 12 Nov: was at the top).
+                PurchaseSection()
+
                 Section {
-                    Text("Speech recognition (Voz) and speaker recognition (Who) by Desert Ant Labs (https://desertant.com)")
+                    // Markdown link: "Desert Ant Labs" opens desertant.com in Safari, in the accent colour.
+                    Text("Speech recognition (Voz) and speaker recognition (Who) by [Desert Ant Labs](https://desertant.com)")
                         .font(.subheadline)
                     model(String(localized: "Speech recognition"), "Voz \(Transcriber.vozVersion)", "NVIDIA Parakeet TDT 0.6B v3")
                     model(String(localized: "Speaker recognition"), "Who \(Transcriber.whoVersion)", "pyannote community-1")
@@ -352,6 +369,9 @@ struct OnboardingView: View {
     @State private var syncOn = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private var sync = CloudSync.shared
+    private var purchases = Purchases.shared
+    @State private var restoring = false
+    @State private var restoreMessage: String?
 
     static let doneKey = "onboarded"
 
@@ -437,6 +457,8 @@ struct OnboardingView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: Self.width, alignment: .leading)
+
+                freeToStart
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)  // the last line scrolls clear of the button
@@ -461,6 +483,56 @@ struct OnboardingView: View {
     }
 
     private static let width: CGFloat = 460
+
+    /// What is free and what comes after (specs/purchase.md), with Restore for who bought it
+    /// already; once Band·je Onbeperkt is known to be owned, only a thank-you. The same header and
+    /// card as the options above.
+    private var freeToStart: some View {
+        let status = Store.status(purchases)
+        // Unknown yet (`.unlocked`: the App Store not read) still shows what is free: a new user's
+        // first launch is not thanked for a purchase.
+        let unlocked = status == .bought || status == .existing
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Free to start")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .padding(.leading, 16)
+                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 10) {
+                if unlocked {
+                    Label {
+                        Text("Everything is unlocked. Thank you!")
+                    } icon: {
+                        Image(systemName: "heart.fill").foregroundStyle(Color("ButtonAccent"))
+                    }
+                    .accessibilityIdentifier("onboardingUnlocked")
+                } else {
+                    // Our product name, in the app's language (StoreKit's follows the storefront's).
+                    Text("Recording is always free, and your first \(FreeAllowance.transcriptions) transcriptions are on us, all on your \(Device.name). After that, \(String(localized: "Band·je Unlimited")): one payment, no subscription.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)  // calm, as the descriptions above
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Already bought it? Restore Purchases") {
+                        Store.run(busy: $restoring, message: $restoreMessage) {
+                            try await purchases.restore()
+                            if !purchases.hasUnlimited { restoreMessage = String(localized: "No purchase to restore was found.") }
+                        }
+                    }
+                    .font(.subheadline)
+                    .disabled(restoring)
+                    .accessibilityIdentifier("onboardingRestore")
+                    if let restoreMessage {
+                        Text(restoreMessage).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .frame(maxWidth: Self.width)
+    }
 
     private func point(_ icon: String, _ title: LocalizedStringKey, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 14) {

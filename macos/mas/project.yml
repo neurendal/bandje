@@ -16,6 +16,9 @@ packages:
   desert-ant-core:
     url: https://github.com/Desert-Ant-Labs/desert-ant-core.git
     exactVersion: 4.2.3
+  # Shared with the iOS app; path relative to this file (mas/).
+  BandjeKit:
+    path: ../../bandje-core
 
 settings:
   base:
@@ -24,6 +27,9 @@ settings:
     # Neurendal B.V. organisation team. Xcode (Settings > Accounts) creates the certificates and
     # the Mac App Store profile itself (-allowProvisioningUpdates).
     DEVELOPMENT_TEAM: KKWHW59YC3
+    # App Group for the shared proof of purchase (docs/pro-sharing.md): the team id above plus a
+    # fixed name, used by the entitlement and by Info.plist's BandjeAppGroup (scripts/mas.sh).
+    BANDJE_APP_GROUP: $(DEVELOPMENT_TEAM).je.bandje.shared
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_ENTITLEMENTS: ../Resources/Bandje-AppStore.entitlements
     # scripts/mas.sh writes this copy of Resources/Info.plist with the build number.
@@ -57,11 +63,17 @@ targets:
       - path: ../Resources/Localization
         type: folder
         buildPhase: none
+    # Run from Xcode: purchases come from this local StoreKit configuration (buy, restore, refund,
+    # Ask to Buy in Debug > StoreKit > Manage Transactions), not the App Store. Archives ignore it.
+    scheme:
+      storeKitConfiguration: Bandje.storekit
     dependencies:
       - package: desert-ant-core
         product: Voz
       - package: desert-ant-core
         product: Who
+      - package: BandjeKit
+        product: BandjeKit
     postBuildScripts:
       # Run before Xcode signs the app, so the help book, translations and models are sealed in.
       - name: Translations, help book and speech models

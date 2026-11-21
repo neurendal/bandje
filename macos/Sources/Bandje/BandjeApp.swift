@@ -1,4 +1,5 @@
 import AppKit
+import BandjeKit
 import Carbon.HIToolbox
 import CoreAudio
 import UniformTypeIdentifiers
@@ -22,32 +23,60 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var recordItem: NSMenuItem!
     private var elapsedItem: NSMenuItem!
+    /// "Markeer dit moment", only while recording (specs/markers.md 4).
+    private var markItem: NSMenuItem!
+    /// The flags of the recording in progress (for the record screen's count; the file is the source).
+    private var recordingMarks = Markers()
     /// "Opname: <folder>": the recording the actions below it work on.
     private var currentItem: NSMenuItem!
     private var recorder: Recorder?
     private var timer: Timer?
+    /// Free space on the running recording's disk, measured off the main thread every
+    /// `DiskSpace.checkInterval` (nil: unknown); `diskChecking` while a measurement runs.
+    private var recordingFreeBytes: Int64?
+    private var diskCheckedAt = Date.distantPast
+    private var diskChecking = false
     private var lastRecording: URL?
+    /// Folder of the newest recording (`OutputLocation.latestRecording`) for the menu header's
+    /// "Laatste opname". `updateMenu` runs every second while recording, so the folder is listed
+    /// again only after the library changed or a recording stopped (`latestFolderStale`).
+    private var latestFolderCache: URL?
+    private var latestFolderStale = true
+    private var latestRecordingFolder: URL? {
+        if latestFolderStale {
+            latestFolderCache = OutputLocation.latestRecording(in: OutputLocation.directory)?.deletingLastPathComponent().standardizedFileURL
+            latestFolderStale = false
+        }
+        return latestFolderCache
+    }
     private var transcribeItem: NSMenuItem!
     /// A file to transcribe; transcripts go to `directory`. `ownRecording` selects mode A/B over C.
     struct TranscriptionJob {
         var audio: URL
         var directory: URL? = nil
         var ownRecording = true
+        /// Started by itself after a recording (Transcribe automatically): past the free limit it
+        /// doesn't start and the window shows the short line, never the paywall.
+        var automatic = false
     }
     /// Files waiting for transcription, oldest first; `transcribing` is the one in progress.
     private var transcriptionQueue: [TranscriptionJob] = []
     /// Stopped recordings still being converted (and moved into iCloud): sync can't be toggled then.
     private var finishing = 0
 
-    /// A job writes into `folder`: being transcribed or queued, summarized, or still finishing.
+    /// A job writes into `folder`: being transcribed or queued, or summarized. Recordings still
+    /// finishing are only counted (`finishing`), not checked here per folder; the staging flush
+    /// skips them by their `.caf` and `recording: true` (`ICloudSync.flushStagingPlan`).
     private func isBusy(_ folder: URL) -> Bool {
         let f = folder.standardizedFileURL.path
         func inside(_ url: URL?) -> Bool { url.map { $0.deletingLastPathComponent().standardizedFileURL.path == f } ?? false }
-        return inside(transcribing) || inside(summarizingJSON.flatMap { summarizing ? $0 : nil })
+        return inside(transcribing) || inside(summarizingJSON)
             || transcriptionQueue.contains { inside($0.audio) }
     }
     private var transcribing: URL?
     private var transcriptionStatus = ""
+    /// Under the status while a model loads for the first time with this build (as on the iPhone).
+    private var transcriptionHint: String?
     /// How far the transcription is (0…1), nil while the model loads.
     private var transcriptionFraction: Double?
     private var dictation: DictationCapture?
@@ -55,10 +84,18 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var dictationBusy = false
     private var dictationTimer: Timer?
     private var dictateItem: NSMenuItem!
+    /// "Nog 5 gratis minuten dicteren": quiet, under Start dicteren, only while few free minutes are left.
+    private var dictationFreeItem: NSMenuItem!
+    /// A finished dictation passed the free warning point; said once Band·je is idle again.
+    private var dictationWarningDue = false
+    /// Until when "⌘V" shows next to the cassette after a dictation that wasn't pasted (`updateClock`).
+    private var pasteHintUntil: Date?
     /// When the dictation shortcut went down; a release after `holdThreshold` means "hold to talk".
     private var dictatePressedAt: Date?
     private static let holdThreshold: TimeInterval = 0.4
+    #if !APPSTORE
     private var accessibilityItem: NSMenuItem!
+    #endif
     private var micMenu: NSMenu!
     private var micItem: NSMenuItem!
     private var outputMenu: NSMenu!
@@ -67,8 +104,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var helpItem: NSMenuItem!
     /// Submenu Recente opnames: the recent recordings with a transcript, and Andere….
     private var chooseMenu: NSMenu!
-    /// `.json` of the newest transcript made in this session, and how many speakers it has.
-    private var lastTranscript: (json: URL, speakers: Int)?
+    /// `.json` of the newest transcript made or chosen in this session.
+    private var lastTranscript: URL?
     /// Submenu `Samenvatten`, only shown when the on-device model is available.
     private var summarizeItem: NSMenuItem!
     private var summarizeMenu: NSMenu!
@@ -92,7 +129,6 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Twice a second while recording or dictating: the clock next to the menu bar icon.
     private var clockTimer: Timer?
 
-
     static func main() {
         let app = NSApplication.shared
         let delegate = BandjeApp()
@@ -104,6 +140,16 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let folderReachable = OutputLocation.restoreChosen()
         #if DEBUG
+        if CommandLine.arguments.contains("--check-system-audio") {
+            Task {
+                let r = await SystemAudioCheck.run()
+                let dir = OutputLocation.defaultDirectory.appendingPathComponent("selftest")
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? (r.map { $0 ? "allowed" : "denied" } ?? "unknown").write(to: dir.appendingPathComponent("system-audio-check.txt"), atomically: true, encoding: .utf8)
+                NSApp.terminate(nil)
+            }
+            return
+        }
         if CommandLine.arguments.contains("--probe-permissions") {
             Task { await PermissionProbe.run() }
             return
@@ -113,8 +159,11 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Announce the help book now: Help Viewer only knows a book after its app registered it, and
         // an anchor (Hoe maak ik een template?) in an unknown book opens the general Mac help.
         NSHelpManager.shared.registerBooks(in: .main)
+        // Freemium (App Store build): transactions, what is owned, the products.
+        Store.start()
         setUpStatusItem()
-        if let problem = registerShortcuts(Shortcut.record, Shortcut.dictate) {
+        Playback.start()
+        if let problem = registerShortcuts(Shortcut.record, Shortcut.dictate, Shortcut.mark, tryMark: false) {
             showAlert(tr("hotkey.taken.title", "Sneltoets niet beschikbaar"), problem)
         }
         if !folderReachable {
@@ -124,6 +173,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // iCloud first (the container lookup can take a moment): then the recordings folder is known.
         // The app delegate lives as long as the process, so strong captures are fine here.
         Activity.shared.toggleRecording = { self.toggleRecording() }
+        Activity.shared.mark = { self.markMoment() }
         Activity.shared.transcribe = { audio in self.transcribeFromWindow(audio) }
         Activity.shared.summarize = { json, template in self.summarizeFromPage(json, template: template) }
         Activity.shared.openTemplates = { self.openTemplates() }
@@ -135,25 +185,47 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             MainActor.assumeIsolated { self.updateDockPolicy() }
         }
         NotificationCenter.default.addObserver(forName: .bandjeLibraryChanged, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { self.updateMenu() }
+            MainActor.assumeIsolated {
+                self.latestFolderStale = true
+                Store.forgetKeys()
+                self.updateMenu()
+            }
         }
         NotificationCenter.default.addObserver(forName: .bandjeWindowSelection, object: nil, queue: .main) { note in
             guard let folder = note.object as? URL else { return }
             MainActor.assumeIsolated { self.followWindowSelection(folder) }
         }
         updateDockPolicy()
+        // A recording that could not move into iCloud yet is tried again when iCloud may be back:
+        // another account or iCloud Drive turned on, or Band·je comes to the front (space freed up).
+        NotificationCenter.default.addObserver(forName: .NSUbiquityIdentityDidChange, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { self.retryPendingMoves(throttled: false) }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                self.retryPendingMoves(throttled: true)
+                Store.refresh()
+            }
+        }
         Task {
             await ICloudSync.prepare()
-            await ICloudSync.flushStaging()
+            handleFlush(await ICloudSync.flushStaging())
             // Old Mac names ("2026-11-05_14-30") become the iPhone's names, in this Mac's language and
             // region, so both show the same title. Nothing is recording or transcribing yet.
             let dir = OutputLocation.directory
             if await Task.detached(priority: .utility, operation: { Library.renameLegacyFolders(in: dir, isBusy: { _ in false }) }).value > 0 {
                 lastRecording = OutputLocation.latestRecording(in: dir)
+                latestFolderStale = true
                 lastTranscript = nil
             }
             LibraryWatcher.shared.start()
             await Activity.shared.reloadTemplates()
+            // Half files from a crash or kill (never a `.caf`, never anything touched in the last hour).
+            let leftovers = [dir, ICloudSync.staging]
+            Task.detached(priority: .utility) {
+                let removed = OutputLocation.removeLeftovers(recordingDirs: leftovers, temp: FileManager.default.temporaryDirectory)
+                if removed > 0 { NSLog("Bandje: removed \(removed) leftover temporary files") }
+            }
             offerRecovery()
             updateMenu()
         }
@@ -163,7 +235,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .paramDescriptor(forKeyword: keyAELaunchedAsLogInItem)?.booleanValue ?? false
         // The first time: the window with the welcome and the permissions, also at login. After
         // that the setting decides; after an update the welcome returns (when the window opens)
-        // only when a permission is missing.
+        // only when the microphone is missing. Automatic pasting is optional and never counts as
+        // missing (App Review 2.4.5, 2026-11-17).
         let defaults = UserDefaults.standard
         ReviewPrompt.noteLaunch()
         let firstLaunch = defaults.integer(forKey: "onboardingVersion") < 1
@@ -171,8 +244,9 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let updated = LaunchPolicy.updated(lastBuild: defaults.string(forKey: "lastLaunchedBuild"), build: build)
         defaults.set(1, forKey: "onboardingVersion")
         defaults.set(build, forKey: "lastLaunchedBuild")
-        let missing = Permissions.microphone != .allowed || !Paste.allowed
+        let missing = Permissions.microphone != .allowed
         Activity.shared.showsWelcome = LaunchPolicy.showWelcome(firstLaunch: firstLaunch, updated: updated, permissionMissing: missing)
+        Activity.shared.welcomeStep = LaunchPolicy.welcomeStep(firstLaunch: firstLaunch)
         if LaunchPolicy.showWindow(atLogin: atLogin, firstLaunch: firstLaunch, setting: LaunchPolicy.windowAtLaunch) {
             MainWindow.show()
         } else {
@@ -205,18 +279,28 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
-    /// Every launch (not the first): a message when the microphone or automatic pasting isn't
-    /// allowed, with Open Settings, Later and the standard "Do not show this message again"
-    /// (switch it back on in Instellingen > Toestemmingen). The sound of the Mac is left out:
-    /// macOS doesn't tell, and a silent last recording is normal for a meeting in a room.
+    /// Every launch (not the first): a message when the microphone or the sound of the Mac isn't
+    /// allowed. Automatic pasting is optional and never listed (App Review 2.4.5, 2026-11-17), with Open Settings, Later and the standard "Do not show this message
+    /// again" (switch it back on in Instellingen > Toegang). The sound of the Mac only when Band·je's
+    /// own check said no, checked again now (it may have been switched on since); a silent last
+    /// recording proves nothing, it is normal for a meeting in a room.
     private func checkPermissionsAtLaunch() {
         guard Permissions.checkAtLaunch, recorder == nil, dictation == nil else { return }
+        guard Permissions.systemAudio == .denied else { return showPermissionsAtLaunch(systemAudioDenied: false) }
+        Task {
+            let allowed = await SystemAudioCheck.run()
+            showPermissionsAtLaunch(systemAudioDenied: allowed == false)
+        }
+    }
+
+    private func showPermissionsAtLaunch(systemAudioDenied: Bool) {
+        guard recorder == nil, dictation == nil else { return }
         var missing: [String] = []
         if Permissions.microphone == .denied {
             missing.append("• " + tr("permcheck.mic", "Microfoon: Band·je hoort jou niet bij opnemen en dicteren."))
         }
-        if Permissions.paste != .allowed {
-            missing.append("• " + tr("permcheck.paste", "Automatisch plakken: gedicteerde tekst staat op het klembord en je plakt zelf met ⌘V."))
+        if systemAudioDenied {
+            missing.append("• " + tr("permcheck.system", "Geluid van je Mac: de andere kant van een gesprek komt niet in je opnames."))
         }
         guard !missing.isEmpty else { return }
         NSApp.activate()
@@ -245,21 +329,71 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: tr("button.convert", "Zet om"))
         alert.addButton(withTitle: tr("button.later", "Later"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
+        finishing += 1  // as after a recording: sync can't be toggled and Band·je won't restart meanwhile
         Task {
+            defer { finishing -= 1 }
             for caf in leftovers {
                 do {
                     let m4a = try await Task.detached(priority: .userInitiated) { try AudioExport.convertToM4A(caf) }.value
                     OutputLocation.finishMeta(m4a.deletingLastPathComponent())
-                    await CoverArt.embed(in: m4a.deletingLastPathComponent())
+                    await CoverArt.embed(in: m4a.deletingLastPathComponent(), own: true)
                     lastRecording = m4a
                 } catch {
                     showAlert(tr("convert.failed", "Omzetten mislukt"), error.localizedDescription)
                 }
             }
-            await ICloudSync.flushStaging()
+            handleFlush(await ICloudSync.flushStaging(isBusy: isBusy))
             updateMenu()
         }
     }
+
+    // MARK: Recordings not in iCloud yet (owner, 2026-11-09)
+
+    /// After a flush of the staging folder: the window and the player follow what moved, the
+    /// library refreshes, and the first time a recording has to stay on this Mac the user is told why.
+    private func handleFlush(_ result: ICloudSync.FlushResult) {
+        for (from, to) in result.moved {
+            if from.lastPathComponent != to.lastPathComponent { Library.shared.noteOwnChange(to) }  // " 2": its cover follows
+            MainWindow.followMove(from: from, to: to)
+            Playback.moved(from: from, to: to)
+            if let last = lastRecording, last.deletingLastPathComponent().standardizedFileURL == from.standardizedFileURL {
+                lastRecording = Library.audioFile(in: to)
+            }
+        }
+        if !result.moved.isEmpty { LibraryWatcher.shared.changed() }
+        if let first = result.failed.first {
+            notePending(first)
+        } else if !result.moved.isEmpty || ICloudSync.flushStagingPlan().isEmpty {
+            // Everything is where it belongs: a next problem is told again.
+            UserDefaults.standard.removeObject(forKey: Self.pendingNoticeKey)
+        }
+    }
+
+    private static let pendingNoticeKey = "iCloudPendingNoticeShown"
+
+    /// A finished recording stays in the staging folder for now: said once (not at every retry or
+    /// every recording), calmly, with the reason. The library shows it from where it is.
+    private func notePending(_ error: Error?) {
+        guard !UserDefaults.standard.bool(forKey: Self.pendingNoticeKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.pendingNoticeKey)
+        showAlert(tr("icloud.pending.title", "Nog niet in iCloud"),
+                  ICloudSync.pendingReason(error) + " "
+                    + tr("icloud.pending.text", "Je opname staat veilig op deze Mac en staat gewoon in Band·je: je kunt hem afspelen, transcriberen, hernoemen en verwijderen. Band·je zet hem in iCloud zodra dat lukt."))
+    }
+
+    /// Tries the staging folder again (sync on and iCloud there; not while a recording finishes).
+    /// `throttled`: at most once a minute (the app comes to the front often).
+    private func retryPendingMoves(throttled: Bool) {
+        guard ICloudSync.isActive, finishing == 0, recorder == nil else { return }
+        if throttled, Date().timeIntervalSince(lastPendingRetry) < 60 { return }
+        lastPendingRetry = Date()
+        Task {
+            guard await !Task.detached(priority: .utility, operation: { ICloudSync.flushStagingPlan().isEmpty }).value else { return }
+            handleFlush(await ICloudSync.flushStaging(isBusy: isBusy))
+            updateMenu()
+        }
+    }
+    private var lastPendingRetry = Date.distantPast
 
     /// A click on the Dock icon (it shows with "Altijd in het Dock") opens the window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -268,11 +402,15 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        Playback.player.saveNow()  // P15
         guard let rec = recorder else { return }
         rec.stop()
+        MarkerFile.drainNow()  // the flags set just before quitting
         // Quitting during a recording: convert now (a few seconds for a long call). If that
         // fails or the process is killed, the .caf is offered for conversion at the next launch.
-        _ = try? AudioExport.convertToM4A(rec.url)
+        // Converted: finished like any recording (else a folder in the staging folder that is still
+        // marked `recording` would never move to iCloud).
+        if let m4a = try? AudioExport.convertToM4A(rec.url) { OutputLocation.finishMeta(m4a.deletingLastPathComponent()) }
     }
 
     /// The menu, in four groups: the two actions with their status lines, the recordings,
@@ -298,7 +436,12 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // 1. Actions
         recordItem = item(tr("menu.record.start", "Start opname"), #selector(toggleRecording))
         elapsedItem = status()
+        markItem = item(tr("menu.mark", "Markeer dit moment"), #selector(markMoment))
+        markItem.indentationLevel = 1
+        markItem.isHidden = true
         dictateItem = item(tr("menu.dictate.start", "Start dicteren"), #selector(dictateFromMenu))
+        dictationFreeItem = status()
+        dictationFreeItem.isHidden = true
         _ = item(tr("menu.transcribeFile", "Transcribeer bestand…"), #selector(transcribeFile))
         transcribeItem = status()
         summaryStatusItem = status()
@@ -333,7 +476,10 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         outputMenu.delegate = self
         outputItem = item(tr("menu.output", "Geluidsuitvoer"), nil)
         outputItem.submenu = outputMenu
+        // Automatic pasting only in a build from source (App Review 2.4.5, see `Paste`).
+        #if !APPSTORE
         accessibilityItem = item(tr("menu.dictate.enablePaste", "Zet automatisch plakken aan…"), #selector(askAccessibility))
+        #endif
 
         // 4. The window, settings, help, about, quit
         menu.addItem(.separator())
@@ -352,6 +498,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         statusItem.menu = menu
         lastRecording = OutputLocation.latestRecording(in: OutputLocation.directory)
+        latestFolderStale = true
         updateMenu()
     }
 
@@ -367,6 +514,21 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     #if DEBUG
     func setUpForSnapshot() { setUpStatusItem() }
 
+    /// `--selftest-gate`: Transcribe in the window, as clicked; did it start, did the paywall show.
+    func transcribeForSelftest(_ audio: URL) async -> (started: Bool, paywall: Bool) {
+        transcribeFromWindow(audio)
+        for _ in 0..<20 where transcribing == nil && !Paywall.isShown {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return (transcribing != nil, Paywall.isShown)
+    }
+
+    /// `--selftest-gate`: the dictation shortcut, only called when the gate stops it before the microphone.
+    func dictateForSelftest() -> (started: Bool, paywall: Bool) {
+        startDictation()
+        return (dictation != nil, Paywall.isShown)
+    }
+
     /// `--selftest-snapshot menu-open`: these device names instead of the real ones, and no
     /// paste-permission item (website screenshots of the menu).
     static var snapshotDevices: (String, String)?
@@ -381,7 +543,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// `--select <json>`: that recording is the menu's current one.
     func selectForSnapshot(_ json: URL) {
-        lastTranscript = (json, (try? TranscriptWriter.read(json: json))?.speakerLabels.count ?? 0)
+        lastTranscript = json
         lastRecording = Library.audioFile(in: json.deletingLastPathComponent())
         updateMenu()
     }
@@ -421,6 +583,10 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let unnamed = currentTranscript.flatMap { try? TranscriptWriter.read(json: $0) }?.unnamedSpeakers ?? 0
             namingItem.title = unnamed > 0 ? tr("menu.nameSpeakers.count", "Benoem sprekers… (%@ zonder naam)", "\(unnamed)")
                                            : tr("menu.nameSpeakers", "Benoem sprekers…")
+            let few = Store.fewDictationMinutesLeft
+            dictationFreeItem.isHidden = few == nil
+            dictationFreeItem.title = few.map(Store.dictationMinutesLeftText) ?? ""
+            #if !APPSTORE
             accessibilityItem.isHidden = Paste.allowed
             // After asking: macOS only reports the new state to a new process.
             accessibilityItem.title = Paste.askedThisLaunch
@@ -429,6 +595,15 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             #if DEBUG
             if Self.snapshotDevices != nil { accessibilityItem.isHidden = true }
             #endif
+            #endif
+        }
+        if let items = Self.storeItems, menu === items.unlimited.menu {
+            // The App Store's names once the products are loaded.
+            items.unlimited.title = tr("menu.buy", "Koop %@…", Store.name(.unlimited))
+            items.dictation.title = tr("menu.buy", "Koop %@…", Store.name(.dictation))
+            items.unlimited.isHidden = Purchases.shared.hasUnlimited
+            items.dictation.isHidden = Purchases.shared.hasDictation
+            return
         }
         if menu === micMenu { fillMicMenu() }
         if menu === summarizeMenu { fillSummarizeMenu() }
@@ -478,13 +653,18 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func chooseOutput(_ sender: NSMenuItem) {
-        guard let uid = sender.representedObject as? String,
-              let device = Recorder.outputDevices().first(where: { $0.uid == uid }) else { return }
+        guard let uid = sender.representedObject as? String else { return }
+        if let problem = useOutput(uid: uid) { showAlert(tr("output.failed", "Geluid niet omgezet"), problem) }
+    }
+
+    /// Makes the output device `uid` the macOS sound output (menu and Settings); returns the
+    /// problem when macOS refuses.
+    private func useOutput(uid: String) -> String? {
+        guard let device = Recorder.outputDevices().first(where: { $0.uid == uid }) else { return nil }
         let status = Recorder.setDefaultOutput(device.id)
-        if status != noErr {
-            showAlert(tr("output.failed", "Geluid niet omgezet"), tr("output.failed.text", "macOS weigert de uitvoer om te zetten naar %1$@ (fout %2$@). Kies het apparaat in Systeeminstellingen > Geluid.", device.name, "\(status)"))
-        }
         updateMenu()
+        return status == noErr ? nil
+            : tr("output.failed.text", "macOS weigert de uitvoer om te zetten naar %1$@ (fout %2$@). Kies het apparaat in Systeeminstellingen > Geluid.", device.name, "\(status)")
     }
 
     @objc private func chooseMic(_ sender: NSMenuItem) {
@@ -543,16 +723,70 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
 
-    // MARK: Dictation
+    // MARK: System audio warning
+
+    /// Once per recording: warn when macOS doesn't let Band·je record the Mac's sound
+    /// (`SystemAudioCheck`, owner 2026-11-12). The recording goes on with the microphone only.
+    private var systemAudioWarningShown = false
+    /// Not before this moment: the next check because the Mac's sound stays silent while another app plays.
+    private var systemAudioRecheckAt = Date.distantFuture
+
+    /// At the start of a recording. On the first recording macOS asks for the permission now, and
+    /// the check sees silence until it is answered: then (and after an earlier "allowed", against a
+    /// fluke) Band·je checks again for a while before it warns.
+    private func checkSystemAudio(_ rec: Recorder) {
+        let before = Permissions.systemAudio
+        Task {
+            var allowed = await SystemAudioCheck.run()
+            if allowed == false, before != .denied, recorder === rec {
+                allowed = await SystemAudioCheck.runAllowingPrompt(patience: .seconds(before == .allowed ? 4 : 30))
+            }
+            if allowed == true, recorder === rec { systemAudioRecheckAt = .distantFuture }  // proven for this recording
+            guard allowed == false else { return }
+            warnSystemAudio(rec)
+        }
+    }
+
+    /// Every second while recording: when nothing of the Mac's sound came in for 15 seconds while
+    /// another app plays sound, check again (at most once a minute). Apps in a call often play
+    /// silence, so only the check itself decides.
+    private func recheckSystemAudioIfSilent(_ rec: Recorder) {
+        guard !systemAudioWarningShown, Date() >= systemAudioRecheckAt, rec.stats.peak < 1e-6,
+              SystemAudioCheck.otherProcessPlays() else { return }
+        systemAudioRecheckAt = Date().addingTimeInterval(60)
+        Task {
+            switch await SystemAudioCheck.run() {
+            case false?: warnSystemAudio(rec)
+            case true?: if recorder === rec { systemAudioRecheckAt = .distantFuture }
+            case nil: break
+            }
+        }
+    }
+
+    private func warnSystemAudio(_ rec: Recorder) {
+        guard !systemAudioWarningShown, recorder === rec else { return }
+        systemAudioWarningShown = true
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = tr("syswarn.title", "Het geluid van je Mac wordt niet opgenomen")
+        alert.informativeText = tr("syswarn.text", "macOS geeft Band·je geen toegang tot het geluid van je Mac. Deze opname heeft alleen je microfoon: de andere kant van een gesprek ontbreekt.\n\nZet Band·je aan bij Systeeminstellingen > Privacy en beveiliging > Scherm- en systeemaudio-opname en start de opname opnieuw.")
+        alert.addButton(withTitle: tr("permcheck.open", "Open instellingen…"))
+        alert.addButton(withTitle: tr("syswarn.continue", "Ga door met alleen microfoon"))
+        NSApp.activate()
+        if alert.runModal() == .alertFirstButtonReturn { Permissions.openSettings("Privacy_ScreenCapture") }
+    }
 
     // MARK: Shortcuts
 
-    /// Registers both global shortcuts and saves them; returns a message when one is taken.
-    /// On failure the old registration is gone, so callers re-apply the previous pair.
+    /// Registers the global shortcuts and saves them; returns a message when one is taken.
+    /// On failure the old registration is gone, so callers re-apply the previous ones.
+    /// Markeren is registered only while recording (`updateMarkShortcut`); `tryMark` (Settings)
+    /// registers it a moment to find out whether another app has it, as the others are checked.
     @discardableResult
-    private func registerShortcuts(_ record: Shortcut, _ dictate: Shortcut) -> String? {
+    private func registerShortcuts(_ record: Shortcut, _ dictate: Shortcut, _ mark: Shortcut, tryMark: Bool = true) -> String? {
         Hotkey.unregister(.record)
         Hotkey.unregister(.dictate)
+        Hotkey.unregister(.mark)
         var problems: [String] = []
         let r = Hotkey.register(.record, key: record.keyCode, modifiers: record.modifiers,
                                 pressed: { [weak self] in self?.toggleRecording() })
@@ -565,13 +799,22 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if d == noErr { Shortcut.dictate = dictate } else {
             problems.append(tr("hotkey.dictate.taken", "%1$@ is al in gebruik door een andere app (fout %2$@). Dicteren kan via het menu, of kies een andere sneltoets.", dictate.display, "\(d)"))
         }
+        if tryMark || recorder != nil {
+            let m = Hotkey.register(.mark, key: mark.keyCode, modifiers: mark.modifiers, pressed: { [weak self] in self?.markMoment() })
+            if m == noErr { Shortcut.mark = mark } else {
+                problems.append(tr("hotkey.mark.taken", "%1$@ is al in gebruik door een andere app (fout %2$@). Markeren kan via het menu, of kies een andere sneltoets.", mark.display, "\(m)"))
+            }
+            if recorder == nil { Hotkey.unregister(.mark) }
+        }
         updateMenu()
         return problems.isEmpty ? nil : problems.joined(separator: "\n\n")
     }
 
-    @objc private func showSettings() {
+    @objc private func showSettings() { openSettings(tab: nil) }
+
+    private func openSettings(tab: Int?) {
         SettingsWindow.show(
-            apply: { [weak self] record, dictate in self?.registerShortcuts(record, dictate) },
+            apply: { [weak self] record, dictate, mark in self?.registerShortcuts(record, dictate, mark) },
             chooseFolder: { [weak self] reset in self?.chooseFolder(reset: reset) ?? false },
             restart: { [weak self] in self?.restart() },
             setSync: { [weak self] on in self?.setSync(on) ?? ICloudSync.isOn },
@@ -580,13 +823,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.useMicrophone(device.id, uid: uid)
                 self?.updateMenu()
             },
-            chooseOutput: { [weak self] uid in
-                guard let device = Recorder.outputDevices().first(where: { $0.uid == uid }) else { return nil }
-                let status = Recorder.setDefaultOutput(device.id)
-                self?.updateMenu()
-                return status == noErr ? nil
-                    : tr("output.failed.text", "macOS weigert de uitvoer om te zetten naar %1$@ (fout %2$@). Kies het apparaat in Systeeminstellingen > Geluid.", device.name, "\(status)")
-            })
+            chooseOutput: { [weak self] uid in self?.useOutput(uid: uid) },
+            tab: tab)
     }
 
     /// Instellingen > iCloud. Returns the switch's new state.
@@ -626,18 +864,32 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         LibraryWatcher.shared.start()
         updateMenu()
         Task {
-            await ICloudSync.flushStaging()
+            handleFlush(await ICloudSync.flushStaging(isBusy: isBusy))
             guard move else { return }
-            var failed: [String] = []
+            var failed: [String] = [], kept: [String] = [], alreadyThere = 0
+            // What is in iCloud already: a recording copied out earlier is not moved in again as "Name 2".
+            let index = await Task.detached(priority: .userInitiated) { ICloudSync.byCreated(documents) }.value
             for folder in folders {
                 do {
-                    _ = try await Task.detached(priority: .userInitiated) { try ICloudSync.publish(folder, into: documents) }.value
+                    switch try await Task.detached(priority: .userInitiated, operation: { try ICloudSync.moveIn(folder, into: documents, index: index) }).value {
+                    case .moved: break
+                    case .alreadyThere: alreadyThere += 1
+                    case .keptLocal: kept.append(folder.lastPathComponent)
+                    }
                 } catch {
                     failed.append(folder.lastPathComponent)
                 }
             }
+            if alreadyThere > 0 || !kept.isEmpty {
+                NSLog("Bandje: sync on: \(alreadyThere) recordings already in iCloud (local folder to the Trash), \(kept.count) kept locally")
+            }
             if !failed.isEmpty {
                 showAlert(tr("icloud.publishFailed.title", "Niet naar iCloud verplaatst"), failed.joined(separator: "\n"))
+            }
+            if !kept.isEmpty {
+                showAlert(tr("icloud.keptLocal.title", "Niet alles verplaatst"),
+                          tr("icloud.keptLocal", "Deze opnames staan al in iCloud, maar Band·je weet niet zeker dat het dezelfde of volledige zijn. Ze blijven staan in %@, zodat er niets verloren gaat:", local.path)
+                            + "\n" + kept.joined(separator: "\n"))
             }
             updateMenu()
         }
@@ -652,6 +904,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if documents != nil { try? Summaries.mergeTemplates(from: cloudTemplates, into: Summaries.localFolder, overwrite: true) }
         LibraryWatcher.shared.start()
         updateMenu()
+        // Recordings that were waiting for iCloud go to the chosen folder now.
+        Task { handleFlush(await ICloudSync.flushStaging(isBusy: isBusy)) }
         guard let documents else { return false }
         let folders = OutputLocation.recordingFolders(in: documents)
         guard !folders.isEmpty else { return false }
@@ -665,13 +919,33 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return false }
         Task {
             var failed: [String] = []
-            for folder in folders {
+            // What is on this Mac already: a recording copied out earlier is not copied again as "Name 2".
+            var index = await Task.detached(priority: .userInitiated) { ICloudSync.byCreated(local) }.value
+            var alreadyHere = 0
+            for (i, folder) in folders.enumerated() {
+                let known = index
+                let existing = await Task.detached(priority: .userInitiated) { ICloudSync.counterpart(of: folder, in: known) }.value
+                if case .same = existing {
+                    alreadyHere += 1
+                    continue
+                }
+                // Copying can be gigabytes: stop before the disk gets too full (`DiskSpace`).
+                let free = await Task.detached(priority: .utility) { Recorder.freeBytes(for: local) }.value
+                if DiskSpace.level(free) == .tooLow {
+                    failed += folders[i...].map(\.lastPathComponent)
+                    showAlert(tr("icloud.copyFailed", "Niet alles gekopieerd"),
+                              tr("icloud.copyDiskFull", "De schijf is bijna vol; Band·je is gestopt met kopiëren. Niet gekopieerd:") + "\n" + failed.joined(separator: "\n"))
+                    updateMenu()
+                    return
+                }
                 do {
-                    _ = try await ICloudSync.copyRecording(folder, into: local)
+                    let copy = try await ICloudSync.copyRecording(folder, into: local)
+                    if let created = RecordingMeta.read(from: copy)?.created { index[created, default: []].append(copy) }
                 } catch {
                     failed.append(folder.lastPathComponent)
                 }
             }
+            if alreadyHere > 0 { NSLog("Bandje: sync off: \(alreadyHere) recordings already on this Mac, not copied") }
             if !failed.isEmpty {
                 showAlert(tr("icloud.copyFailed", "Niet alles gekopieerd"), failed.joined(separator: "\n"))
             }
@@ -714,13 +988,14 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         lastTranscript = nil
         lastRecording = OutputLocation.latestRecording(in: OutputLocation.directory)
+        latestFolderStale = true
         updateMenu()
         return true
     }
 
     /// After a language change: start a new instance, then quit this one.
     private func restart() {
-        guard recorder == nil, transcribing == nil, !summarizing, dictation == nil else {
+        guard recorder == nil, transcribing == nil, !summarizing, dictation == nil, !dictationBusy, finishing == 0 else {
             showAlert(tr("restart.busy", "Nog niet herstarten"), tr("restart.busy.text", "Band·je is bezig. Herstart Band·je als de opname, transcriptie of samenvatting klaar is."))
             return
         }
@@ -737,10 +1012,12 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    #if !APPSTORE
     @objc private func askAccessibility() {
         if Paste.askedThisLaunch { restart(); return }
         Paste.requestPermission()
     }
+    #endif
 
     /// From the menu: like a tap, so Enter stops (the menu is gone before the user speaks).
     @objc private func dictateFromMenu() {
@@ -774,15 +1051,28 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func startDictation() {
         guard dictation == nil else { return }
         guard !dictationBusy else { NSSound.beep(); return }
+        // Freemium: the free minutes are used up. One that runs when they run out finished normally;
+        // this one doesn't start (nothing listens, nothing is pasted) and the paywall comes to the front.
+        guard Store.mayDictate else {
+            dictationLog.notice("start: free dictation minutes used")
+            dictatePressedAt = nil
+            NSSound.beep()
+            Paywall.show(.dictation)
+            return
+        }
         guard Transcriber.modelsPresent() else {
             showAlert(tr("dictate.notStarted", "Dicteren niet gestart"), Transcriber.missingModels)
             return
         }
+        // P8: the microphone would hear the player; it stays paused afterwards.
+        Playback.player.pause(reason: .dictationStarted)
         let capture = DictationCapture()
         dictation = capture // claims the slot now; the permission check below is async
         Task {
             guard await Permissions.microphoneAllowed() else {
+                guard dictation === capture else { return } // cancelled or released meanwhile
                 dictation = nil
+                updateMenu()
                 showAlert(tr("dictate.notStarted", "Dicteren niet gestart"), Permissions.microphoneDenied)
                 return
             }
@@ -864,9 +1154,12 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showAlert(tr("dictate.silent.title", "Niets gehoord"), tr("dictate.silent.text", "De microfoon “%@” gaf alleen stilte. Kies je microfoon in het menu Microfoon. Is de klep dicht, dan staat de ingebouwde microfoon uit.", mic.isEmpty ? "?" : mic))
             return
         }
+        if Store.noteDictated(seconds) { dictationWarningDue = true }
         dictationBusy = true
         updateMenu()
         Task {
+            // Whatever happens below: the free-minutes note comes after it (after the paste).
+            defer { showDictationWarningWhenIdle() }
             var text = ""
             var failure: String?
             do {
@@ -887,11 +1180,26 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard !text.isEmpty else { NSSound.beep(); return }
             let outcome = await Paste.deliver(Self.withTrailingSpace(text), paste: paste)
             dictationLog.notice("deliver: \(outcome.rawValue, privacy: .public)")
-            // Secure input or no paste permission: the text is on the clipboard; a sound says "paste it
-            // yourself" without taking the focus. Never ask for the permission here: a prompt or System
-            // Settings right after dictating gets in the way (and App Review frowns on it). Band·je asks
-            // at launch (welcome or permission check) and from the menu and Settings, when the user chooses.
-            if outcome == .secureInput || outcome == .notAllowed { NSSound(named: "Funk")?.play() }
+            // Secure input: the text is on the clipboard; a sound says "paste it yourself" without
+            // taking the focus. No paste permission: silent, pasting with ⌘V is the normal way and
+            // automatic pasting optional (owner, 2026-11-17). Never ask for the permission here: a prompt or System
+            // Settings right after dictating gets in the way (and App Review frowns on it). Band·je only
+            // asks when the user turns automatic pasting on (welcome, menu or Settings).
+            if outcome == .secureInput { NSSound(named: "Funk")?.play() }
+            if outcome == .notAllowed || outcome == .secureInput { showPasteHint() }
+        }
+    }
+
+    /// The once-only free dictation note (`Store.showDictationWarning`). It takes the focus, so only
+    /// a moment after the paste (the target app handles ⌘V first) and never during a dictation; a
+    /// dictation started meanwhile takes it along to its own end.
+    private func showDictationWarningWhenIdle() {
+        guard dictationWarningDue else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard dictationWarningDue, dictation == nil, !dictationBusy, !Paywall.isShown else { return }
+            dictationWarningDue = false
+            Store.showDictationWarning()
         }
     }
 
@@ -906,8 +1214,27 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 showAlert(tr("record.notStarted", "Opname niet gestart"), Permissions.microphoneDenied)
                 return
             }
-            guard recorder == nil else { return }
+            // System audio not known to be allowed (a first recording): let macOS ask now and wait
+            // for the answer. A recording started while macOS's question is open fails (error
+            // 268451843, measured 2026-11-12). Off: the recording starts anyway and warns at once.
+            let systemAudio = Permissions.systemAudio
+            if systemAudio != .allowed {
+                _ = await SystemAudioCheck.runAllowingPrompt(patience: .seconds(systemAudio == .denied ? 0 : 30))
+            }
+            // Free space first, before the recording's folder is made: where the recording is
+            // written and where it ends up (the chosen folder, another disk or iCloud Drive).
             let dir = OutputLocation.recordingDirectory
+            let destination = OutputLocation.directory
+            let free = await Task.detached(priority: .userInitiated) { () -> Int64? in
+                let here = Recorder.freeBytes(for: dir), there = Recorder.freeBytes(for: destination)
+                guard let here, let there else { return here ?? there }
+                return min(here, there)
+            }.value
+            if let problem = Recorder.startProblem(freeBytes: free) {
+                showAlert(tr("record.notStarted", "Opname niet gestart"), problem)
+                return
+            }
+            guard recorder == nil else { return }
             do {
                 do {
                     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -924,16 +1251,47 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         self.showAlert(tr("record.stopped", "Opname gestopt"), message)
                     }
                 }
+                // P7: the recording would take in the player's sound; it stays paused afterwards.
+                Playback.player.pause(reason: .recordingStarted)
                 try rec.start()
                 recorder = rec
+                recordingFreeBytes = free
+                diskCheckedAt = Date()
+                recordingMarks = Markers()
+                Activity.shared.recordingMarkers = 0
+                updateMarkShortcut()
                 micWarningShown = false
+                systemAudioWarningShown = false
+                systemAudioRecheckAt = Date().addingTimeInterval(15)
                 startTimer()
                 checkMicrophone(rec, elapsed: 0)
+                checkSystemAudio(rec)
             } catch {
                 showAlert(tr("record.notStarted", "Opname niet gestart"), error.localizedDescription)
             }
             updateMenu()
         }
+    }
+
+    // MARK: Markers (specs/markers.md)
+
+    /// ⌃⌥⌘M is Band·je's only while recording: outside a recording another app may use it.
+    private func updateMarkShortcut() {
+        guard recorder != nil else { Hotkey.unregister(.mark); return }
+        let mark = Shortcut.mark
+        Hotkey.register(.mark, key: mark.keyCode, modifiers: mark.modifiers, pressed: { [weak self] in self?.markMoment() })
+    }
+
+    /// Markeer dit moment (menu, shortcut, the record screen's flag): a marker at the time in the
+    /// audio written so far, into the recording's `.bandje.json` at once (it survives a crash).
+    @objc private func markMoment() {
+        guard let rec = recorder, rec.startDate != nil else { NSSound.beep(); return }
+        let time = Double(rec.framesWritten) / FileWriter.fileSampleRate
+        let folder = rec.url.deletingLastPathComponent()
+        MarkerFile.changeLater(in: folder, { $0.add(at: time) }, failed: { NSSound.beep() })
+        recordingMarks.add(at: time)  // within a second of the last flag: that one (Markers.mergeDistance)
+        Activity.shared.recordingMarkers = recordingMarks.count
+        NSSound(named: "Tink")?.play()
     }
 
     private func stopRecording(_ rec: Recorder) {
@@ -942,9 +1300,11 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         rec.stop()
         recorder = nil
+        updateMarkShortcut()
         timer?.invalidate()
         timer = nil
         lastRecording = rec.url
+        latestFolderStale = true
         updateMenu()
         let caf = rec.url
         finishing += 1
@@ -952,40 +1312,44 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             defer { finishing -= 1 }
             do {
                 var m4a = try await Task.detached(priority: .userInitiated) { try AudioExport.convertToM4A(caf) }.value
+                // The flags set while recording are on disk before `.bandje.json` is read and written again.
+                await MarkerFile.drain()
                 OutputLocation.finishMeta(m4a.deletingLastPathComponent())
                 // The cover goes into the audio now, before it moves to iCloud or is transcribed.
-                await CoverArt.embed(in: m4a.deletingLastPathComponent())
+                await CoverArt.embed(in: m4a.deletingLastPathComponent(), own: true)
                 // Syncing: the finished recording moves from the staging folder into iCloud Drive.
+                // When that fails, or iCloud isn't there (signed out, iCloud Drive off), it stays in
+                // the staging folder: the library shows it from there, and it is moved later.
+                let inStaging = ICloudSync.isStaged(m4a.deletingLastPathComponent())
                 if ICloudSync.isActive, let documents = ICloudSync.documents {
-                    let folder = m4a.deletingLastPathComponent(), name = m4a.lastPathComponent
+                    let folder = m4a.deletingLastPathComponent()
                     do {
                         let moved = try await Task.detached(priority: .userInitiated) { try ICloudSync.publish(folder, into: documents) }.value
-                        m4a = moved.appendingPathComponent(name)
+                        // Under a new name when it was taken in iCloud (" 2"): its cover follows.
+                        m4a = Library.audioFile(in: moved) ?? moved.appendingPathComponent(m4a.lastPathComponent)
+                        if moved.lastPathComponent != folder.lastPathComponent { Library.shared.noteOwnChange(moved) }
+                        UserDefaults.standard.removeObject(forKey: Self.pendingNoticeKey)
                     } catch {
-                        showAlert(tr("icloud.publishFailed.title", "Niet naar iCloud verplaatst"),
-                                  tr("icloud.publishFailed", "Naar iCloud verplaatsen lukte niet; Band·je probeert het opnieuw bij de volgende start. %@", error.localizedDescription))
+                        NSLog("Bandje: the recording stays in the staging folder for now: \(error.localizedDescription)")
+                        notePending(error)
                     }
+                } else if ICloudSync.isOn, inStaging {
+                    notePending(nil)
                 }
-                // Recorded into staging while sync was on, but iCloud isn't there (any more): local folder.
-                let staging = ICloudSync.staging.standardizedFileURL.path
-                if !ICloudSync.isActive, m4a.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL.path == staging {
+                // Recorded into staging, but sync was turned off since: the chosen folder.
+                if !ICloudSync.isOn, inStaging {
                     let folder = m4a.deletingLastPathComponent(), local = OutputLocation.localDirectory
-                    if let moved = try? await Task.detached(priority: .userInitiated, operation: { () throws -> URL in
-                        try FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
-                        let target = local.appendingPathComponent(OutputLocation.uniqueName(folder.lastPathComponent, in: local))
-                        try Files.move(folder, to: target)
-                        try Library.renameFiles(in: target, from: folder.lastPathComponent, to: target.lastPathComponent)
-                        return target
-                    }).value {
+                    if let moved = try? await Task.detached(priority: .userInitiated, operation: { try ICloudSync.moveLocal(folder, into: local) }).value {
                         m4a = moved.appendingPathComponent(moved.lastPathComponent + ".m4a")
                     }
                 }
                 if lastRecording == caf { lastRecording = m4a }
-                MainWindow.reveal(m4a)  // the window shows the recording just made
+                MainWindow.reveal(m4a, opening: true)  // the window opens with the recording just made
                 if Self.autoTranscribe { enqueueTranscription(m4a) }
             } catch {
                 showAlert(tr("convert.failed", "Omzetten mislukt"), error.localizedDescription)
             }
+            latestFolderStale = true
             updateMenu()
         }
     }
@@ -993,6 +1357,10 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// "Transcribeer" in the window, for a recording without transcript (from the iPhone, or an
     /// older one): audio still in iCloud is downloaded first. Mode A/B only for the Mac's own stereo recordings.
     private func transcribeFromWindow(_ audio: URL) {
+        guard Store.mayTranscribe(audio: audio) else {
+            Paywall.show(.transcribe) { [weak self] in self?.transcribeFromWindow(audio) }
+            return
+        }
         Task {
             do {
                 try await Activity.shared.whileDownloading(audio) { try await ICloudSync.ensureDownloaded(audio) }
@@ -1013,7 +1381,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Transcriptions run one at a time at low priority; a recording can start at any moment and
     /// is not affected (its capture runs on the Core Audio IO thread and its own writer thread).
     func enqueueTranscription(_ audio: URL) {
-        transcriptionQueue.append(TranscriptionJob(audio: audio))
+        transcriptionQueue.append(TranscriptionJob(audio: audio, automatic: true))
         runNextTranscription()
     }
 
@@ -1021,9 +1389,14 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// access via the open panel); a copy, the transcript and the player go to the recordings folder
     /// under the file's name. A stereo file named like our own recordings goes through mode A/B, anything else mode C.
     @objc private func transcribeFile() {
+        guard Store.mayTranscribeNew else {
+            Paywall.show(.transcribe) { [weak self] in self?.transcribeFile() }
+            return
+        }
         NSApp.activate()
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio]
+        // Video too: only its sound is kept (OutputLocation.prepareImport), as on the iPhone.
+        panel.allowedContentTypes = [.audio, .movie]
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.message = tr("panel.transcribe.message", "Kies een of meer audiobestanden om te transcriberen.")
@@ -1036,14 +1409,31 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showAlert(tr("transcribe.none", "Geen transcriptie"), tr("transcribe.folderFailed", "Kan de opnamemap %@ niet maken.", dir.path))
             return
         }
-        for url in panel.urls {
-            let name = url.deletingPathExtension().lastPathComponent
-            // An imported file gets its own folder with a copy of the audio, for the player.
-            let (folder, audio) = OutputLocation.importFolder(for: url, in: dir)
-            transcriptionQueue.append(TranscriptionJob(audio: audio, directory: folder,
-                                                       ownRecording: TranscriptWriter.isRecordingName(name)))
+        let urls = panel.urls
+        Task {
+            var first: URL?
+            var problems: [String] = []
+            for url in urls {
+                let name = url.deletingPathExtension().lastPathComponent
+                // An imported file gets its own folder with a copy of the audio, for the player.
+                let (folder, copy) = OutputLocation.importFolder(for: url, in: dir)
+                let audio: URL
+                do {
+                    audio = try await OutputLocation.prepareImport(folder: folder, copy: copy, original: url)
+                } catch {
+                    if copy != url { try? FileManager.default.removeItem(at: folder) }
+                    problems.append(error.localizedDescription)
+                    continue
+                }
+                if first == nil { first = audio }
+                transcriptionQueue.append(TranscriptionJob(audio: audio, directory: folder,
+                                                           ownRecording: TranscriptWriter.isRecordingName(name)))
+            }
+            runNextTranscription()
+            // The window opens with the (first) file, so its progress shows there.
+            if let first { MainWindow.reveal(first, opening: true) }
+            if !problems.isEmpty { showAlert(tr("transcribe.none", "Geen transcriptie"), problems.joined(separator: "\n\n")) }
         }
-        runNextTranscription()
     }
 
     private func runNextTranscription() {
@@ -1054,6 +1444,18 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         let job = transcriptionQueue.removeFirst()
+        // Freemium: checked again here, as a queued one may come after the last free one finished.
+        // A manual one asks (and continues after a purchase); an automatic one just doesn't start.
+        guard Store.mayTranscribe(audio: job.audio) else {
+            if !job.automatic {
+                Paywall.show(.transcribe) { [weak self] in
+                    self?.transcriptionQueue.append(job)
+                    self?.runNextTranscription()
+                }
+            }
+            runNextTranscription()
+            return
+        }
         let audio = job.audio
         transcribing = audio
         transcriptionStatus = tr("status.transcribing", "Transcriberen…")
@@ -1082,7 +1484,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func show(_ status: Transcriber.Status) {
         guard transcribing != nil else { return }
         switch status {
-        case .loading(_, let expected):
+        case .loading(let model, let firstTime, let expected):
             let since = Date()
             loadingSince = since
             loadingTimer?.invalidate()
@@ -1092,7 +1494,10 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     let elapsed = Date().timeIntervalSince(since)
                     guard elapsed >= 1 else { return }
                     let percent = Transcriber.loadPercent(elapsed: elapsed, expected: expected)
-                    self.transcriptionStatus = tr("status.loadingPercent", "Model laden… %@%%", "\(percent)")
+                    self.transcriptionStatus = model == .speakers
+                        ? tr("status.speakersPercent", "Sprekers herkennen… %@%%", "\(percent)")
+                        : tr("status.speechPercent", "Spraakmodel voorbereiden… %@%%", "\(percent)")
+                    self.transcriptionHint = firstTime ? Self.firstLoadHint : nil
                     self.updateMenu()
                 }
             }
@@ -1103,10 +1508,15 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             loadingSince = nil
             loadingTimer?.invalidate()
             loadingTimer = nil
+            transcriptionHint = nil
             transcriptionFraction = f
             transcriptionStatus = tr("status.progress", "Transcriberen… %@%%", "\(Int((f * 100).rounded()))")
         }
         updateMenu()
+    }
+
+    static var firstLoadHint: String {
+        tr("status.firstLoad", "Alleen de eerste keer na installeren of bijwerken: dit duurt ongeveer een minuut.")
     }
 
     private func finishTranscription(_ audio: URL, _ result: Result<URL, Error>) {
@@ -1115,14 +1525,15 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loadingTimer?.invalidate()
         loadingTimer = nil
         transcriptionStatus = ""
+        transcriptionHint = nil
         transcriptionFraction = nil
         switch result {
         case .failure(let error):
             showAlert(tr("transcribe.failed", "Transcriberen mislukt"), "\(audio.lastPathComponent): \(error.localizedDescription)")
         case .success(let md):
             let json = md.deletingPathExtension().appendingPathExtension("json")
-            let speakers = (try? TranscriptWriter.read(json: json))?.speakerLabels.count ?? 0
-            lastTranscript = (json, speakers)
+            lastTranscript = json
+            Store.noteTranscribed(json: json)
             announceDone(tr("done.transcript", "Transcript klaar: %@", recordingName(of: json)), json: json)
             LibraryWatcher.shared.changed()
         }
@@ -1138,17 +1549,42 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openWindow() { MainWindow.show() }
 
+    /// Wijzig › Zoek… (⌘F): search the open recording's transcript.
+    @objc func findInTranscript() { NotificationCenter.default.post(name: .bandjeFind, object: nil) }
+
     /// The Dock icon (and the app's own menu bar) while the window is open, or always when the
     /// user chose that in Instellingen; otherwise menu bar only.
     private func updateDockPolicy() {
         let regular = LaunchPolicy.dockIcon(windowVisible: MainWindow.isOpen, minimized: MainWindow.isMinimized,
                                             alwaysInDock: UserDefaults.standard.bool(forKey: "showInDock"))
-        if regular, NSApp.mainMenu == nil { NSApp.mainMenu = Self.makeMainMenu() }
+        if regular, NSApp.mainMenu == nil {
+            NSApp.mainMenu = Self.makeMainMenu()
+            NSApp.mainMenu?.items.first?.submenu?.delegate = self  // hides the Buy items already owned
+        }
         NSApp.setActivationPolicy(regular ? .regular : .accessory)
     }
 
     /// The main menu's Samenvatten (hidden without Apple Intelligence).
     private static var summariesMenuItem: NSMenuItem?
+    /// The main menu's Archief › Start opname and Start dicteren, kept in step with the menu bar menu.
+    private static var fileMenuItems: (record: NSMenuItem, dictate: NSMenuItem)?
+    /// The app menu's Buy items (App Store build).
+    private static var storeItems: (unlimited: NSMenuItem, dictation: NSMenuItem)?
+
+    // MARK: Purchases (App Store build, specs/purchase.md)
+
+    @objc private func buyUnlimited() { Paywall.show(.transcribe) }
+
+    @objc private func buyDictation() { Paywall.show(.dictation) }
+
+    @objc private func restorePurchases() { Task { await Store.restore(alert: true) } }
+
+    /// Settings › Aankopen with the App Store's redeem sheet.
+    @objc private func redeemCode() {
+        PurchasesSettings.redeemOnAppear = true
+        openSettings(tab: SettingsWindow.purchasesTab)
+        NotificationCenter.default.post(name: .bandjeRedeemCode, object: nil)
+    }
 
     /// The app menu bar for while Bandje has a window: About, Settings, Quit; Edit (so ⌘C/⌘V/⌘A work
     /// in the window's text fields); Window.
@@ -1166,16 +1602,38 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             i.keyEquivalentModifierMask = mods
             return i
         }
-        submenu("Band·je", [
+        var app = [
             it(tr("menu.about", "Over Band·je"), #selector(BandjeApp.showAbout), ""),
             .separator(),
             it(tr("menu.settings", "Instellingen…"), #selector(BandjeApp.showSettings), ","),
+        ]
+        // Freemium (owner, 2026-11-11): the purchases after Settings, as the HIG puts them; only
+        // in the App Store build. A Buy item hides once that product is owned.
+        if Store.isActive {
+            let unlimited = it(tr("menu.buy", "Koop %@…", tr("store.unlimited", "Band·je Onbeperkt")), #selector(BandjeApp.buyUnlimited), "")
+            let dictation = it(tr("menu.buy", "Koop %@…", tr("store.dictation", "Band·je Dicteren")), #selector(BandjeApp.buyDictation), "")
+            storeItems = (unlimited, dictation)
+            app += [.separator(), unlimited, dictation,
+                    it(tr("store.restore", "Herstel aankopen"), #selector(BandjeApp.restorePurchases), ""),
+                    it(tr("store.redeem", "Wissel code in…"), #selector(BandjeApp.redeemCode), "")]
+        }
+        app += [
             .separator(),
             it(tr("menu.hide", "Verberg Band·je"), #selector(NSApplication.hide(_:)), "h"),
             it(tr("menu.quit", "Stop Band·je"), #selector(NSApplication.terminate(_:)), "q"),
-        ])
-        // Open opnamemap lives here (owner: rarely used from the menu bar).
+        ]
+        submenu("Band·je", app)
+        // Open opnamemap lives here (owner: rarely used from the menu bar). Recording, dictating and
+        // Transcribeer bestand… (⌘O) as in the menu bar menu (owner, 2026-11-12); their titles and
+        // shortcuts follow it in `updateMenu`.
+        let record = it(tr("menu.record.start", "Start opname"), #selector(BandjeApp.toggleRecording), "")
+        let dictate = it(tr("menu.dictate.start", "Start dicteren"), #selector(BandjeApp.dictateFromMenu), "")
+        fileMenuItems = (record, dictate)
         submenu(tr("menu.file", "Archief"), [
+            record,
+            dictate,
+            it(tr("menu.transcribeFile", "Transcribeer bestand…"), #selector(BandjeApp.transcribeFile), "o"),
+            .separator(),
             it(tr("menu.openFolder", "Open opnamemap"), #selector(BandjeApp.openFolder), ""),
             .separator(),
             it(tr("window.print", "Druk af…"), #selector(BandjeApp.printTranscript), "p"),
@@ -1197,6 +1655,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             it(tr("menu.copy", "Kopieer"), #selector(NSText.copy(_:)), "c"),
             it(tr("menu.paste", "Plak"), #selector(NSText.paste(_:)), "v"),
             it(tr("menu.selectAll", "Selecteer alles"), #selector(NSText.selectAll(_:)), "a"),
+            .separator(),
+            it(tr("menu.find", "Zoek…"), #selector(BandjeApp.findInTranscript), "f"),
         ])
         submenu(tr("menu.window", "Venster"), [
             it(tr("menu.minimize", "Minimaliseer"), #selector(NSWindow.performMiniaturize(_:)), "m"),
@@ -1221,7 +1681,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// `.json` of the newest transcript of this session, else that of the last recording.
     private var currentTranscript: URL? {
-        if let json = lastTranscript?.json, FileManager.default.fileExists(atPath: json.path) { return json }
+        if let json = lastTranscript, FileManager.default.fileExists(atPath: json.path) { return json }
         guard let audio = lastRecording else { return nil }
         let json = audio.deletingPathExtension().appendingPathExtension("json")
         return FileManager.default.fileExists(atPath: json.path) ? json : nil
@@ -1272,11 +1732,10 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func summarizeLast(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String,
               let template = Summaries.templates().first(where: { $0.name == name }) else { return }
-        if let json = currentTranscript {
-            summarize(json, template)
-        } else if let json = chooseTranscript() {
-            summarize(json, template)
-        }
+        guard let json = currentTranscript ?? chooseTranscript() else { return }
+        // Chosen in the menu: the window opens with the recording, its progress shows there.
+        MainWindow.reveal(json, opening: true)
+        summarize(json, template)
     }
 
     /// Menu Recente opnames: the eight most recent recordings with a transcript (by recording
@@ -1306,8 +1765,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func chooseRecording(_ sender: NSMenuItem) {
         guard let json = (sender.representedObject as? URL) ?? chooseTranscript(),
               FileManager.default.fileExists(atPath: json.path) else { return }
-        let speakers = (try? TranscriptWriter.read(json: json))?.speakerLabels.count ?? 0
-        lastTranscript = (json, speakers)
+        lastTranscript = json
         let audio = json.deletingPathExtension().appendingPathExtension("m4a")
         if FileManager.default.fileExists(atPath: audio.path) { lastRecording = audio }
         updateMenu()
@@ -1319,7 +1777,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func followWindowSelection(_ folder: URL) {
         let json = folder.appendingPathComponent("\(folder.lastPathComponent).json")
         if FileManager.default.fileExists(atPath: json.path) {
-            lastTranscript = (json, (try? TranscriptWriter.read(json: json))?.speakerLabels.count ?? 0)
+            lastTranscript = json
         } else {
             lastTranscript = nil
         }
@@ -1374,6 +1832,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             await MainActor.run {
                 self.summarizing = false
+                self.summarizingJSON = nil
                 self.updateMenu()
                 switch result {
                 case .success:
@@ -1402,8 +1861,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             alert.addButton(withTitle: tr("button.cancel", "Annuleer"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        let speakers = (try? TranscriptWriter.read(json: json))?.speakerLabels.count ?? 0
-        lastTranscript = (json, speakers)
+        lastTranscript = json
         summarize(json, template)
     }
 
@@ -1435,7 +1893,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 ShareText.show([page], kind: .webPage, title: recordingName(of: json), date: OutputLocation.recordingDate(json),
                                relativeTo: button.bounds, of: button)
             } catch {
-                showAlert(tr("export.failed", "Webpagina maken mislukt"), error.localizedDescription)
+                showAlert(tr("export.failed", "Audiopagina maken mislukt"), error.localizedDescription)
             }
         }
     }
@@ -1526,24 +1984,45 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func startTimer() {
         timer?.invalidate()
-        let t = Timer(timeInterval: 1, repeats: true) { _ in
-            MainActor.assumeIsolated { [weak self] in self?.tick() }
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(t, forMode: .common) // keeps ticking while the menu is open
         timer = t
     }
 
-    /// Every second while recording: elapsed time, and stop on a full disk or write error.
+    /// Every second while recording: elapsed time, and stop (keeping the recording) on a write
+    /// error, a full disk or after `AutoStop.maxDuration`.
     private func tick() {
-        if let rec = recorder, let problem = rec.healthProblem() {
-            stopRecording(rec)
-            showAlert(tr("record.stopped", "Opname gestopt"), problem)
-            return
+        if let rec = recorder {
+            let elapsed = rec.startDate.map { Date().timeIntervalSince($0) } ?? 0
+            if let stop = AutoStop.check(writeError: rec.writeError, freeBytes: recordingFreeBytes, elapsed: elapsed) {
+                stopRecording(rec)
+                showAlert(tr("record.stopped", "Opname gestopt"), stop.message)
+                return
+            }
+            checkDiskSpace(rec)
         }
         if let rec = recorder, let start = rec.startDate {
             checkMicrophone(rec, elapsed: Date().timeIntervalSince(start))
+            recheckSystemAudioIfSilent(rec)
         }
         updateMenu()
+    }
+
+    /// Every `DiskSpace.checkInterval`: the free space on the recording's disk, measured off the main
+    /// thread (on a nearly full disk macOS can take a while to answer). The next tick acts on it.
+    private func checkDiskSpace(_ rec: Recorder) {
+        guard !diskChecking, Date().timeIntervalSince(diskCheckedAt) >= DiskSpace.checkInterval else { return }
+        diskChecking = true
+        let folder = rec.url.deletingLastPathComponent()
+        Task {
+            let free = await Task.detached(priority: .utility) { Recorder.freeBytes(for: folder) }.value
+            diskChecking = false
+            diskCheckedAt = Date()
+            guard recorder === rec else { return }
+            recordingFreeBytes = free
+        }
     }
 
     @objc private func openFolder() {
@@ -1562,22 +2041,27 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.recordingStarted = recorder?.startDate
         window.transcribing = transcribing
         window.transcriptionStatus = transcriptionStatus
+        window.transcriptionHint = transcriptionHint
         window.transcriptionFraction = transcriptionFraction
         window.summaryFraction = summarizing && summaryPercent >= 0 ? Double(summaryPercent) / 100 : nil
-        window.summarizing = summarizing ? summarizingJSON : nil
+        window.summarizing = summarizingJSON
         window.summaryStatus = summaryStatusItem?.title ?? ""
         window.summariesAvailable = Self.summariesAvailable
         guard statusItem != nil else { return }
         let recording = recorder != nil
         recordItem.title = recording ? tr("menu.record.stop", "Stop opname") : tr("menu.record.start", "Start opname")
         elapsedItem.isHidden = !recording
+        markItem.isHidden = !recording
         if let start = recorder?.startDate {
             elapsedItem.title = OutputLocation.elapsedString(Date().timeIntervalSince(start))
         }
+        // A gentle warning while recording on a disk that is getting full (`DiskSpace.warningLevel`).
+        let diskLow = recording && Recorder.diskLevel(recordingFreeBytes, floor: Recorder.minFreeBytesWhileRecording) == .low
+        elapsedItem.subtitle = diskLow ? tr("record.diskLow", "Schijf bijna vol: de opname stopt vanzelf bij minder dan 1 GB vrij.") : nil
         if let name = currentRecordingName,
            let file = currentTranscript ?? lastRecording {
             let folder = file.deletingLastPathComponent()
-            let latest = OutputLocation.latestRecording(in: OutputLocation.directory)?.deletingLastPathComponent().standardizedFileURL == folder.standardizedFileURL
+            let latest = latestRecordingFolder == folder.standardizedFileURL
             currentItem.title = Self.menuHeader(title: name, date: OutputLocation.recordingDate(folder.appendingPathComponent("\(folder.lastPathComponent).json")),
                                                 latest: latest)
         } else {
@@ -1585,6 +2069,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         transcribeItem.isHidden = transcribing == nil
         transcribeItem.title = transcriptionStatus
+        transcribeItem.subtitle = transcriptionHint
         summaryStatusItem.isHidden = !summarizing
         summarizeItem.isHidden = !Self.summariesAvailable
         Self.summariesMenuItem?.isHidden = !Self.summariesAvailable
@@ -1599,6 +2084,14 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dictateItem.isEnabled = !dictationBusy
         (recordItem.keyEquivalent, recordItem.keyEquivalentModifierMask) = Shortcut.record.menuKey
         (dictateItem.keyEquivalent, dictateItem.keyEquivalentModifierMask) = Shortcut.dictate.menuKey
+        (markItem.keyEquivalent, markItem.keyEquivalentModifierMask) = Shortcut.mark.menuKey
+        if let (fileRecord, fileDictate) = Self.fileMenuItems {
+            fileRecord.title = recordItem.title
+            (fileRecord.keyEquivalent, fileRecord.keyEquivalentModifierMask) = Shortcut.record.menuKey
+            fileDictate.title = dictateItem.title
+            fileDictate.isEnabled = dictateItem.isEnabled
+            (fileDictate.keyEquivalent, fileDictate.keyEquivalentModifierMask) = Shortcut.dictate.menuKey
+        }
         updateReelAnimation(recording)
         updateClock()
         doneItem.isHidden = done == nil
@@ -1609,7 +2102,7 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Hover on the menu bar icon: what Bandje is doing, with progress.
         var activity: [String] = []
         if recording { activity.append(tr("a11y.recording", "Band·je neemt op") + " · " + elapsedItem.title) }
-        if transcribing != nil { activity.append(transcriptionStatus) }
+        if transcribing != nil { activity += [transcriptionStatus] + [transcriptionHint].compactMap { $0 } }
         if summarizing { activity.append(summaryStatusItem.title) }
         statusItem.button?.toolTip = activity.isEmpty ? "Bandje" : activity.joined(separator: "\n")
     }
@@ -1681,8 +2174,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// While recording the reels turn (10 frames per second); stops with the recording.
     private func updateReelAnimation(_ recording: Bool) {
         if recording, reelTimer == nil {
-            let t = Timer(timeInterval: 0.1, repeats: true) { _ in
-                MainActor.assumeIsolated { [weak self] in
+            let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
                     guard let self else { return }
                     self.reelAngle -= .pi / 15
                     if self.dictation == nil { self.statusItem.button?.image = Self.recordingIcon(self.reelAngle) }
@@ -1705,8 +2198,8 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let (text, color) = clock ?? ("", .clear)
         let running = clock != nil
         if running, clockTimer == nil {
-            let t = Timer(timeInterval: 0.5, repeats: true) { _ in
-                MainActor.assumeIsolated { [weak self] in self?.updateClock() }
+            let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateClock() }
             }
             RunLoop.main.add(t, forMode: .common)
             clockTimer = t
@@ -1715,8 +2208,14 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             clockTimer = nil
         }
         guard running else {
-            if !button.title.isEmpty { button.title = "" }
-            button.imagePosition = .imageOnly
+            if let until = pasteHintUntil, until > Date() {
+                button.title = " ⌘V"
+                button.imagePosition = .imageLeading
+            } else {
+                pasteHintUntil = nil
+                if !button.title.isEmpty { button.title = "" }
+                button.imagePosition = .imageOnly
+            }
             return
         }
         let size = NSFont.menuBarFont(ofSize: 0).pointSize
@@ -1725,6 +2224,19 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .foregroundColor: color,
         ])
         button.imagePosition = .imageLeading
+    }
+
+    /// After a dictation that wasn't pasted (automatic pasting off, or secure input): "⌘V" next to
+    /// the cassette for 3 seconds, so the user knows the text waits on the clipboard (owner,
+    /// 2026-11-17). No focus taken, nothing asked. A recording's or dictation's clock wins.
+    private func showPasteHint() {
+        let until = Date().addingTimeInterval(3)
+        pasteHintUntil = until
+        updateClock()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.05) { [weak self] in
+            guard let self, self.pasteHintUntil == until else { return }
+            self.updateClock()
+        }
     }
 
     /// A space after the dictated text, so the next dictation (or typing) doesn't stick to it
@@ -1806,8 +2318,4 @@ final class BandjeApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.informativeText = text
         alert.runModal()
     }
-}
-
-extension Array {
-    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }

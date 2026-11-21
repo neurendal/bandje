@@ -8,7 +8,7 @@ Band·je enregistre deux choses à la fois : votre microphone et tout le son que
 
 - Pendant l’enregistrement, la cassette dans la barre des menus devient rouge, ses bobines tournent et la durée défile à côté, en rouge.
 - Votre Mac ne se met pas en veille pendant que Band·je enregistre.
-- La première fois, macOS vous demande l’autorisation d’enregistrer le son de votre Mac. Acceptez, sinon Band·je n’entend que votre microphone.
+- macOS vous demande l’autorisation d’enregistrer le son de votre Mac quand vous cliquez sur **Autoriser…** dans l’accueil ou sous Réglages › Accès, ou sinon au premier enregistrement. Acceptez, sinon Band·je n’entend que votre microphone. Au début de chaque enregistrement, Band·je le vérifie en silence et vous prévient tout de suite s’il est désactivé.
 - Si votre microphone reste silencieux pendant six secondes, ou si l’écran est fermé alors que le microphone intégré est utilisé, Band·je vous prévient et propose de passer à un autre microphone.
 
 Prévenez les autres personnes que vous enregistrez. Dans certains pays, et dans un cadre professionnel, la loi l’exige, et il faut parfois aussi leur accord. Vous êtes responsable du respect de la loi qui s’applique à vous. Band·je vous le rappelle une fois, avant votre premier enregistrement.
@@ -50,33 +50,30 @@ Sur une ligne téléphonique avec un menu ou une musique d’attente, Band·je e
 ## La fenêtre Band·je {#player}
 Tous vos enregistrements dans une seule fenêtre : écouter, lire en même temps, rechercher, nommer les locuteurs, résumer et partager.
 
-Choisissez **Ouvrir Band·je** dans le menu (⌘O). La fenêtre s’ouvre aussi quand vous lancez Band·je vous-même, par exemple depuis Launchpad ou Spotlight. **Ouvrir dans Band·je** ouvre l’enregistrement en cours. Tant que la fenêtre est ouverte, Band·je est dans le Dock et dans ⌘Tab ; fermez-la et Band·je ne se trouve plus que dans la barre des menus. Activez **Toujours dans le Dock** dans [Réglages](#settings) pour garder l’icône. La première fois, la fenêtre s’ouvre toujours, avec les autorisations, chacune avec son bouton. Fermez la fenêtre et Band·je reste dans la barre des menus ; quittez Band·je depuis ce menu.
+Choisissez **Ouvrir Band·je** dans le menu (⌘O). La fenêtre s’ouvre aussi quand vous lancez Band·je vous-même, par exemple depuis Launchpad ou Spotlight. **Ouvrir dans Band·je** ouvre l’enregistrement en cours. Tant que la fenêtre est ouverte, Band·je est dans le Dock et dans ⌘Tab ; fermez-la et Band·je ne se trouve plus que dans la barre des menus. Activez **Toujours dans le Dock** dans [Réglages](#settings) pour garder l’icône. La première fois, la fenêtre s’ouvre toujours avec un accueil en deux étapes : d’abord les raccourcis, puis **Suivant** vers les autorisations, chacune avec son bouton. Fermez la fenêtre et Band·je reste dans la barre des menus ; quittez Band·je depuis ce menu.
 
 - À gauche : vos enregistrements par jour, avec l’heure, la durée et les premiers mots de la transcription. La recherche trouve les titres et les mots des transcriptions. En bas se trouve **Démarrer l’enregistrement** ; pendant l’enregistrement, le nouvel enregistrement apparaît en haut avec un point rouge, et la fenêtre l’ouvre quand vous arrêtez.
 - À droite : l’enregistrement avec la cassette, la barre de position et le bouton de lecture (Espace). Cliquez sur une phrase pour écouter à partir de là ; pendant la lecture, la phrase en cours s’illumine et la transcription suit. **Rechercher dans la transcription** (⌘F) trouve des mots.
 - À côté de **Transcription** se trouve l’onglet **Résumé**. Sans résumé, il contient **Résumer** : choisissez un modèle, voir [Résumés](#summaries). Chaque résumé a son propre onglet ; **Autre résumé** en crée un autre.
 - Pas encore de transcription (un enregistrement de votre iPhone, par exemple) ? Cliquez sur **Transcrire**.
-- **Partager** : **Audio…**, **Transcription (.md)…**, **Transcription en PDF…** ou **Page web avec audio…** : un seul fichier avec le lecteur, la transcription, les résumés et l’audio, qui fonctionne dans tout navigateur, même hors ligne. **Page web avec audio, compacte (pour e-mail)…** réduit l’audio. La page contient un lien vers band.je, et rien d’autre.
-- Sur papier : **Imprimer…** (⌘P, ou dans **Partager**) imprime la transcription, comme le PDF.
+- **Partager** : **Audio…** et **Page audio…** partagent l’enregistrement. **Partager en…**, **Copier en…** et **Enregistrer sous…** demandent d’abord **PDF**, **Texte** ou **Markdown** et forment un seul document : d’abord les résumés, puis la transcription. Avec des résumés, vous cochez aussi ce qu’il contient (tout est coché). **Enregistrer sous…** l’enregistre où vous voulez, **Copier en…** le place dans le presse-papiers. **Page audio…** est un seul fichier avec le lecteur, la transcription, les résumés et l’audio, qui fonctionne dans tout navigateur, même hors ligne. **Page audio, compacte (pour e-mail)…** réduit l’audio. La page contient un lien vers band.je, et rien d’autre.
+- Sur papier : **Imprimer…** (⌘P, ou dans **Partager**) imprime le même document que le PDF.
+- Copier : **Copier** à côté d’un résumé place son texte dans le presse-papiers. Vous pouvez aussi sélectionner du texte et appuyer sur ⌘C.
 - **Plus** : **Nom et couleur…** (ou cliquez sur le titre sur la cassette) : le nom et la couleur de la cassette, **Nommer les locuteurs…**, **Afficher dans le Finder**, **Supprimer…** (vers la Corbeille).
 - Vous pouvez aussi supprimer un enregistrement depuis la liste : cliquez dessus avec le bouton droit et choisissez **Supprimer…**, ou sélectionnez-le et appuyez sur ⌫. Band·je demande d’abord confirmation.
 
 ## Dictée {#dictation}
-Appuyez sur ⌃⌥⌘D, parlez, et le texte apparaît là où se trouve votre curseur : dans une messagerie, un e-mail, un éditeur ou Terminal.
+Appuyez sur ⌃⌥⌘D, parlez, et votre texte est dans le presse-papiers. Collez-le avec ⌘V là où se trouve votre curseur : dans une messagerie, un e-mail, un éditeur ou Terminal.
 
 Il y a deux façons d’utiliser le raccourci :
 
 - **Appuyez brièvement** sur ⌃⌥⌘D : Band·je écoute jusqu’à ce que vous appuyiez sur Return, ou à nouveau sur ⌃⌥⌘D. La touche Return elle-même n’est pas envoyée à l’app.
-- **Maintenez** ⌃⌥⌘D : Band·je écoute tant que vous maintenez les touches et colle le texte quand vous les relâchez.
+- **Maintenez** ⌃⌥⌘D : Band·je écoute tant que vous maintenez les touches et place le texte dans le presse-papiers quand vous les relâchez.
 
 Appuyez sur Esc pour annuler. L’icône de la barre des menus devient orange pendant que Band·je écoute, avec la durée à côté. Une dictée peut durer jusqu’à cinq minutes ; pendant les 30 dernières secondes, la durée clignote.
 
 ### Coller
-Le texte est toujours dans le presse-papiers. Pour le coller à votre place, Band·je a besoin de l’autorisation d’envoyer une frappe (⌘V) : choisissez **Activer le collage automatique…** dans le menu, ou allez dans Réglages Système > Confidentialité et sécurité > Accessibilité et activez Band·je. Sans cela, vous collez vous-même avec ⌘V.
-
-macOS ne signale cette autorisation à Band·je qu’après un redémarrage. Vous venez de l’activer ? Choisissez **Redémarrer Band·je pour le collage automatique** dans le menu, ou **Redémarrer Band·je** dans [Réglages](#settings).
-
-Si vous entendez un bref son au lieu d’un collage, un champ de mot de passe ou une autre app a activé la saisie sécurisée (l’Entrée clavier sécurisée de Terminal, un gestionnaire de mots de passe). macOS bloque alors le collage ; le texte est dans le presse-papiers, appuyez donc vous-même sur ⌘V.
+Après la dictée, le texte est dans le presse-papiers et ⌘V s’affiche un instant à côté de la cassette. Appuyez sur ⌘V pour le coller là où se trouve votre curseur. Le texte reste dans le presse-papiers jusqu’à ce que vous copiiez autre chose : vous pouvez donc aussi le coller plus tard ou à plusieurs endroits.
 
 Rien de ce que vous dictez n’est conservé.
 
@@ -170,7 +167,25 @@ Cliquez sur **Modifier…** et choisissez un dossier, n’importe où sur votre 
 Si le dossier se trouve dans iCloud Drive, Dropbox ou un autre service cloud (y compris Bureau et Documents lorsqu’ils sont dans iCloud), Band·je vous prévient : vos enregistrements quittent alors votre Mac via ce service.
 
 ### Accès
-Si Band·je peut utiliser le micro, coller pour vous et enregistrer le son de votre Mac, avec un bouton pour chacun (**Autoriser…** ou **Ouvrir les réglages…**). Une coche verte signifie autorisé ; l’état se met à jour tout seul quand vous revenez des Réglages Système. Voir [Dépannage](#troubleshooting).
+Si Band·je peut utiliser le micro et enregistrer le son de votre Mac, avec un bouton pour chacun (**Autoriser…** ou **Ouvrir les réglages…**). Une coche verte signifie autorisé ; l’état se met à jour tout seul quand vous revenez des Réglages Système. Voir [Dépannage](#troubleshooting).
+
+## Band·je Illimité {#purchases}
+Ce qui est gratuit, ce que débloquent les deux achats et comment les restaurer (Band·je de l’App Store).
+
+Band·je est gratuit. L’enregistrement est toujours gratuit et jamais limité.
+
+- **La transcription** est gratuite pour vos 5 premiers enregistrements. Un enregistrement compte une fois, quand sa première transcription est terminée ; le transcrire à nouveau est gratuit.
+- **La dictée** est gratuite pour 15 minutes d’audio dicté au total. Une dictée en cours quand les minutes sont épuisées se termine normalement. Après 10 minutes, Band·je indique une fois combien de minutes gratuites il reste ; le menu de la barre des menus l’affiche aussi.
+- Ce que vous avez déjà reste à vous : transcriptions, résumés, partage et exports ne sont jamais verrouillés. Les résumés sont gratuits sur chaque transcription.
+
+Deux achats, chacun payé une seule fois, sans abonnement :
+
+- **Band·je Illimité** : transcription et dictée sans limite.
+- **Band·je Dictée** : dictée sans limite.
+
+Achetez-les dans **Réglages… › Achats**, ou choisissez **Acheter Band·je Illimité…** dans le menu Band·je quand la fenêtre est ouverte. Une fois les transcriptions gratuites utilisées, **Transcrire** affiche d’abord Band·je Illimité ; une transcription automatique ne démarre pas, et l’enregistrement l’indique.
+
+Si vous avez acheté Band·je avant qu’il ne devienne gratuit, tout est débloqué, sans rien faire. Un achat fonctionne sur chaque Mac, iPhone et iPad avec le même compte Apple, et avec le Partage familial. Sur un autre Mac, choisissez **Restaurer les achats**. La partie gratuite se compte par appareil. La fenêtre de bienvenue indique ce qui est gratuit, avec **Déjà acheté ? Restaurer les achats**.
 
 ## Confidentialité et réseau {#privacy}
 Votre audio, vos transcriptions et vos résumés ne quittent jamais votre Mac.
@@ -199,15 +214,14 @@ Solutions aux problèmes possibles.
 Beaucoup de problèmes viennent d’une autorisation manquante. Choisissez **Réglages…** et regardez sous **Accès** :
 
 - **Micro** : nécessaire pour enregistrer votre voix et pour dicter.
-- **Son de votre Mac** : nécessaire pour enregistrer votre interlocuteur. macOS ne permet pas aux apps de lire cette autorisation, Band·je montre donc ce qui s’est passé lors du dernier enregistrement : du son est arrivé, ou c’était silencieux. Le silence est normal si rien ne jouait.
-- **Collage automatique** : nécessaire pour coller le texte dicté à votre place.
+- **Son de votre Mac** : nécessaire pour enregistrer votre interlocuteur. macOS ne permet pas aux apps de lire cette autorisation, Band·je le vérifie donc lui-même : il joue pendant une demi-seconde un signal inaudible qui n’atteint jamais vos haut-parleurs ni vos AirPods, et regarde s’il arrive. **Autoriser…** fait demander macOS ; après **Ouvrir les réglages…**, la coche apparaît dès que vous avez activé Band·je.
 
 Une coche verte signifie autorisé. Sinon, cliquez sur **Ouvrir les réglages…**, activez Band·je et revenez ; Band·je le voit tout seul.
 
-À chaque démarrage, Band·je vérifie le microphone et le collage automatique, et vous prévient s’il en manque un. Vous n’avez pas besoin du collage automatique ? Cochez **Ne plus afficher ce message**, ou désactivez **Avertir au démarrage s’il manque quelque chose** sous Accès.
+À chaque démarrage, Band·je vérifie le microphone, ainsi que le son de votre Mac s’il était désactivé, et vous prévient s’il en manque un. Vous ne voulez pas ce message ? Cochez **Ne plus afficher ce message**, ou désactivez **Avertir au démarrage s’il manque quelque chose** sous Accès.
 
 ### Votre interlocuteur manque dans l’enregistrement
-macOS n’a pas autorisé Band·je à enregistrer le son de votre Mac. Allez dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système et activez Band·je sous Enregistrement des sons du système uniquement.
+macOS n’a pas autorisé Band·je à enregistrer le son de votre Mac. Band·je vous en prévient au début d’un enregistrement. Allez dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système et activez Band·je sous Enregistrement des sons du système uniquement. Ça ne marche toujours pas juste après ? Redémarrez Band·je.
 
 ### Ma propre voix manque
 Vérifiez le menu **Microphone**. Écran fermé, le microphone intégré est désactivé : choisissez-en un autre. Si Band·je n’a pas du tout le droit d’utiliser le microphone, activez-le dans Réglages Système > Confidentialité et sécurité > Microphone.

@@ -8,7 +8,7 @@ Band·je nagrywa jednocześnie dwie rzeczy: Twój mikrofon i cały dźwięk odtw
 
 - Podczas nagrywania kaseta na pasku menu robi się czerwona, jej szpule się obracają, a obok czerwonym kolorem biegnie czas.
 - Gdy Band·je nagrywa, Mac nie przechodzi w stan uśpienia.
-- Za pierwszym razem macOS poprosi o pozwolenie na nagrywanie dźwięku z Maca. Zezwól, inaczej Band·je usłyszy tylko Twój mikrofon.
+- macOS poprosi o pozwolenie na nagrywanie dźwięku z Maca, gdy klikniesz **Zezwól…** w oknie powitalnym lub w Ustawienia › Dostęp, a w przeciwnym razie przy pierwszym nagraniu. Zezwól, inaczej Band·je usłyszy tylko Twój mikrofon. Na początku każdego nagrania Band·je po cichu to sprawdza i od razu Cię ostrzega, jeśli jest wyłączone.
 - Jeśli mikrofon milczy przez sześć sekund albo pokrywa zostanie zamknięta, gdy używany jest wbudowany mikrofon, Band·je Cię ostrzeże i zaproponuje przełączenie na inny mikrofon.
 
 Uprzedź pozostałe osoby, że nagrywasz. W niektórych krajach, a także w zastosowaniach służbowych, wymaga tego prawo, a czasem potrzebna jest też ich zgoda. Odpowiadasz za przestrzeganie prawa, które Cię dotyczy. Band·je przypomni Ci o tym raz, przed pierwszym nagraniem.
@@ -50,33 +50,30 @@ Przy linii telefonicznej z menu lub muzyką w oczekiwaniu Band·je czasem słysz
 ## Okno Band·je {#player}
 Wszystkie nagrania w jednym oknie: słuchaj, czytaj na bieżąco, szukaj, nazywaj mówców, podsumowuj i udostępniaj.
 
-Wybierz **Otwórz Band·je** w menu (⌘O). Okno otwiera się też, gdy sam uruchomisz Band·je, na przykład z Launchpada lub Spotlight. **Otwórz w Band·je** otwiera bieżące nagranie. Gdy okno jest otwarte, Band·je jest w Docku i w ⌘Tab; zamknij je, a Band·je znów będzie tylko na pasku menu. Włącz **Zawsze w Docku** w [Ustawienia](#settings), aby ikona została. Za pierwszym razem okno otwiera się zawsze, z uprawnieniami, każde z własnym przyciskiem. Po zamknięciu okna Band·je zostaje na pasku menu; zakończ Band·je w tym menu.
+Wybierz **Otwórz Band·je** w menu (⌘O). Okno otwiera się też, gdy sam uruchomisz Band·je, na przykład z Launchpada lub Spotlight. **Otwórz w Band·je** otwiera bieżące nagranie. Gdy okno jest otwarte, Band·je jest w Docku i w ⌘Tab; zamknij je, a Band·je znów będzie tylko na pasku menu. Włącz **Zawsze w Docku** w [Ustawienia](#settings), aby ikona została. Za pierwszym razem okno otwiera się zawsze z powitaniem w dwóch krokach: najpierw skróty, potem **Dalej** do uprawnień, każde z własnym przyciskiem. Po zamknięciu okna Band·je zostaje na pasku menu; zakończ Band·je w tym menu.
 
 - Po lewej: nagrania według dni, z godziną, długością i pierwszymi słowami transkrypcji. Wyszukiwanie znajduje tytuły i słowa w transkrypcjach. Na dole jest **Rozpocznij nagrywanie**; podczas nagrywania nowe nagranie jest na górze z czerwoną kropką, a po zatrzymaniu okno je otwiera.
 - Po prawej: nagranie z kasetą, paskiem pozycji i przyciskiem odtwarzania (Spacja). Kliknij zdanie, aby słuchać od tego miejsca; podczas odtwarzania słyszane zdanie jest podświetlone, a transkrypcja przewija się za nim. **Szukaj w transkrypcji** (⌘F) znajduje słowa.
 - Obok **Transkrypcja** jest karta **Podsumowanie**. Gdy nie ma jeszcze podsumowania, jest tam **Podsumuj**: wybierz szablon, zobacz [Podsumowania](#summaries). Każde podsumowanie ma własną kartę; **Kolejne podsumowanie** tworzy kolejne.
 - Nie ma jeszcze transkrypcji (np. przy nagraniu z iPhone'a)? Kliknij **Transkrybuj**.
-- **Udostępnij**: **Dźwięk…**, **Transkrypcja (.md)…**, **Transkrypcja jako PDF…** lub **Strona z dźwiękiem…**: jeden plik z odtwarzaczem, transkrypcją, podsumowaniami i dźwiękiem, który działa w każdej przeglądarce, także offline. **Strona z dźwiękiem, kompaktowa (do e-maila)…** zmniejsza dźwięk. Strona ma link do band.je i nic więcej.
-- Na papierze: **Drukuj…** (⌘P lub w **Udostępnij**) drukuje transkrypcję, tak jak PDF.
+- **Udostępnij**: **Audio…** i **Strona audio…** udostępniają nagranie. **Udostępnij jako…**, **Kopiuj jako…** i **Zachowaj jako…** najpierw pytają o **PDF**, **Tekst** lub **Markdown** i są jednym dokumentem: najpierw podsumowania, potem transkrypcja. Przy podsumowaniach zaznaczasz też, co ma się w nim znaleźć (wszystko jest zaznaczone). **Zachowaj jako…** zachowuje go tam, gdzie chcesz, **Kopiuj jako…** umieszcza go w schowku. **Strona audio…** to jeden plik z odtwarzaczem, transkrypcją, podsumowaniami i dźwiękiem, który działa w każdej przeglądarce, także offline. **Strona audio, kompaktowa (do e-maila)…** zmniejsza dźwięk. Strona ma link do band.je i nic więcej.
+- Na papierze: **Drukuj…** (⌘P lub w **Udostępnij**) drukuje ten sam dokument co PDF.
+- Kopiowanie: **Kopiuj** obok podsumowania kopiuje jego tekst do schowka. Możesz też zaznaczyć tekst i nacisnąć ⌘C.
 - **Więcej**: **Nazwa i kolor…** (albo kliknij tytuł na kasecie): nazwa i kolor kasety, **Nazwij mówców…**, **Pokaż w Finderze**, **Usuń…** (do Kosza).
 - Nagranie możesz też usunąć z listy: kliknij je prawym przyciskiem i wybierz **Usuń…** albo zaznacz je i naciśnij ⌫. Band·je najpierw zapyta.
 
 ## Dyktowanie {#dictation}
-Naciśnij ⌃⌥⌘D, mów, a tekst pojawi się tam, gdzie jest kursor: w czacie, e-mailu, edytorze lub Terminalu.
+Naciśnij ⌃⌥⌘D, mów, a tekst trafi do schowka. Wklej go przez ⌘V tam, gdzie jest kursor: w czacie, e-mailu, edytorze lub Terminalu.
 
 Skrótu można używać na dwa sposoby:
 
 - **Naciśnij krótko** ⌃⌥⌘D: Band·je słucha, aż naciśniesz Return albo ponownie ⌃⌥⌘D. Sam Return nie jest wysyłany do aplikacji.
-- **Przytrzymaj** ⌃⌥⌘D: Band·je słucha, dopóki trzymasz klawisze, i wkleja tekst, gdy je puścisz.
+- **Przytrzymaj** ⌃⌥⌘D: Band·je słucha, dopóki trzymasz klawisze, i umieszcza tekst w schowku, gdy je puścisz.
 
 Naciśnij Esc, aby anulować. Gdy Band·je słucha, ikona na pasku menu robi się pomarańczowa, a obok widać czas. Jedno dyktowanie może trwać do pięciu minut; w ostatnich 30 sekundach czas miga.
 
 ### Wklejanie
-Tekst zawsze trafia do schowka. Aby wkleić go za Ciebie, Band·je potrzebuje pozwolenia na wysłanie naciśnięcia klawisza (⌘V): wybierz **Włącz automatyczne wklejanie…** w menu albo przejdź do Ustawienia systemowe > Prywatność i ochrona > Dostępność i włącz Band·je. Bez tego wklejasz samodzielnie przez ⌘V.
-
-macOS informuje działające Band·je o tym pozwoleniu dopiero po ponownym uruchomieniu. Dopiero je włączono? Wybierz **Uruchom Band·je ponownie, by wklejać automatycznie** w menu albo **Uruchom Band·je ponownie** w [Ustawienia](#settings).
-
-Jeśli zamiast wklejenia słyszysz krótki dźwięk, pole hasła lub inna aplikacja włączyła bezpieczne wprowadzanie (Bezpieczne wprowadzanie z klawiatury w Terminalu, menedżer haseł). macOS blokuje wtedy wklejanie; tekst jest w schowku, więc naciśnij ⌘V samodzielnie.
+Po dyktowaniu tekst jest w schowku, a obok kasety na chwilę pojawia się ⌘V. Naciśnij ⌘V, aby wkleić go tam, gdzie jest kursor. Tekst zostaje w schowku, dopóki nie skopiujesz czegoś innego, więc możesz wkleić go też później lub w kilku miejscach.
 
 Nic, co dyktujesz, nie jest zapisywane.
 
@@ -170,7 +167,25 @@ Kliknij **Zmień…** i wybierz folder w dowolnym miejscu na Macu lub na dysku z
 Jeśli folder jest w iCloud Drive, Dropbox lub innej usłudze chmurowej (także Biurko i Dokumenty, gdy są w iCloud), Band·je Cię ostrzeże: nagrania opuszczają wtedy Maca przez tę usługę.
 
 ### Dostęp
-Czy Band·je może używać mikrofonu, wklejać za ciebie i nagrywać dźwięk z Maca, każde z własnym przyciskiem (**Zezwól…** lub **Otwórz ustawienia…**). Zielony znacznik oznacza zgodę; stan odświeża się sam, gdy wracasz z Ustawień systemowych. Zobacz [Rozwiązywanie problemów](#troubleshooting).
+Czy Band·je może używać mikrofonu i nagrywać dźwięk z Maca, każde z własnym przyciskiem (**Zezwól…** lub **Otwórz ustawienia…**). Zielony znacznik oznacza zgodę; stan odświeża się sam, gdy wracasz z Ustawień systemowych. Zobacz [Rozwiązywanie problemów](#troubleshooting).
+
+## Band·je Bez limitu {#purchases}
+Co jest za darmo, co odblokowują dwa zakupy i jak je odtworzyć (Band·je z App Store).
+
+Band·je jest za darmo. Nagrywanie jest zawsze darmowe i nigdy nie ma limitu.
+
+- **Transkrypcja** jest darmowa dla pierwszych 5 nagrań. Nagranie liczy się raz, gdy skończy się jego pierwsza transkrypcja; ponowna transkrypcja jest darmowa.
+- **Dyktowanie** jest darmowe przez łącznie 15 minut dyktowanego dźwięku. Dyktowanie, które trwa, gdy minuty się skończą, kończy się normalnie. Po 10 minutach Band·je raz informuje, ile darmowych minut zostało; pokazuje to też menu na pasku menu.
+- To, co już masz, pozostaje twoje: transkrypcje, streszczenia, udostępnianie i eksport nigdy nie są blokowane. Streszczenia są darmowe dla każdej transkrypcji.
+
+Dwa zakupy, każdy płatny raz, bez subskrypcji:
+
+- **Band·je Bez limitu**: transkrypcja i dyktowanie bez limitu.
+- **Band·je Dyktowanie**: dyktowanie bez limitu.
+
+Kup je w **Ustawienia… › Zakupy** albo wybierz **Kup Band·je Bez limitu…** w menu Band·je, gdy okno jest otwarte. Po wykorzystaniu darmowych transkrypcji **Transkrybuj** najpierw pokazuje Band·je Bez limitu; automatyczna transkrypcja się nie zaczyna, a nagranie o tym mówi.
+
+Jeśli Band·je zostało kupione, zanim stało się darmowe, wszystko jest odblokowane bez żadnych działań. Zakup działa na każdym Macu, iPhonie i iPadzie z tym samym Kontem Apple oraz w Chmurze rodzinnej. Na innym Macu wybierz **Odtwórz zakupy**. Darmowa część liczy się osobno na każdym urządzeniu. Okno powitalne mówi, co jest darmowe, i ma **Już kupione? Odtwórz zakupy**.
 
 ## Prywatność i sieć {#privacy}
 Twój dźwięk, transkrypcje i podsumowania nigdy nie opuszczają Maca.
@@ -199,15 +214,14 @@ Rozwiązania problemów, które mogą się pojawić.
 Wiele problemów wynika z brakującego uprawnienia. Wybierz **Ustawienia…** i zajrzyj do sekcji **Dostęp**:
 
 - **Mikrofon**: potrzebny do nagrywania Twojego głosu i do dyktowania.
-- **Dźwięk z Maca**: potrzebny do nagrywania drugiej strony. macOS nie pozwala aplikacjom odczytać tego uprawnienia, więc Band·je pokazuje, co działo się podczas ostatniego nagrania: dźwięk docierał albo była cisza. Cisza jest normalna, jeśli nic nie grało.
-- **Automatyczne wklejanie**: potrzebne do wklejania podyktowanego tekstu za Ciebie.
+- **Dźwięk z Maca**: potrzebny do nagrywania drugiej strony. macOS nie pozwala aplikacjom odczytać tego uprawnienia, więc Band·je sprawdza to sam: przez pół sekundy odtwarza niesłyszalny sygnał, który nigdy nie trafia do głośników ani AirPods, i patrzy, czy dociera. **Zezwól…** sprawia, że macOS zapyta; po **Otwórz ustawienia…** znacznik pojawi się, gdy tylko włączysz Band·je.
 
 Zielony znacznik oznacza zgodę. W przeciwnym razie kliknij **Otwórz ustawienia…**, włącz Band·je i wróć; Band·je zauważy to sam.
 
-Przy każdym uruchomieniu Band·je sprawdza mikrofon i automatyczne wklejanie i informuje, jeśli czegoś brakuje. Nie potrzebujesz automatycznego wklejania? Zaznacz **Nie pokazuj ponownie tego komunikatu** albo wyłącz **Ostrzegaj przy uruchomieniu, gdy czegoś brakuje** w sekcji Dostęp.
+Przy każdym uruchomieniu Band·je sprawdza mikrofon, a także dźwięk z Maca, jeśli był wyłączony, i informuje, jeśli czegoś brakuje. Nie chcesz komunikatu? Zaznacz **Nie pokazuj ponownie tego komunikatu** albo wyłącz **Ostrzegaj przy uruchomieniu, gdy czegoś brakuje** w sekcji Dostęp.
 
 ### W nagraniu brakuje drugiej strony
-macOS nie pozwolił Band·je nagrywać dźwięku z Maca. Przejdź do Ustawienia systemowe > Prywatność i ochrona > Nagrywanie ekranu i dźwięku systemowego i włącz Band·je w sekcji Tylko nagrywanie dźwięku systemowego.
+macOS nie pozwolił Band·je nagrywać dźwięku z Maca. Band·je ostrzega o tym na początku nagrania. Przejdź do Ustawienia systemowe > Prywatność i ochrona > Nagrywanie ekranu i dźwięku systemowego i włącz Band·je w sekcji Tylko nagrywanie dźwięku systemowego. Zaraz potem nadal nie działa? Uruchom ponownie Band·je.
 
 ### Brakuje mojego głosu
 Sprawdź menu **Mikrofon**. Przy zamkniętej pokrywie wbudowany mikrofon jest wyłączony: wybierz inny. Jeśli Band·je w ogóle nie ma dostępu do mikrofonu, włącz go w Ustawienia systemowe > Prywatność i ochrona > Mikrofon.

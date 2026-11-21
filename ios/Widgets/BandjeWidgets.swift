@@ -75,7 +75,6 @@ private struct LockScreenView: View {
     }
 }
 
-/// The red recording lamp; hollow while paused.
 /// Bandje's cassette in miniature (the app icon's shapes and colours), with the recording lamp:
 /// red while recording, dimmed while paused. Live Activities cannot animate, so the reels stand still.
 private struct MiniCassette: View {

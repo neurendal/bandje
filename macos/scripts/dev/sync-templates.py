@@ -3,7 +3,7 @@
 
   python3 -I scripts/dev/sync-templates.py [path/to/SummaryTemplates.json]
 
-Source (default): ~/Code/Claude/projects/bandje-ios/Bandje/SummaryTemplates.json, one entry per
+Source (default): ../bandje-ios/Bandje/SummaryTemplates.json (next to this repo), one entry per
 language: {"fileWord": ..., "templates": [{"name", "text"} x 4]} (meeting, job interview, customer
 interview, generic summary). Writes Sources/Bandje/SummaryTemplates.swift, which holds the JSON as is,
 so both apps seed the same examples into the shared Templates folder.
@@ -11,7 +11,7 @@ so both apps seed the same examples into the shared Templates folder.
 import json, os, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-src = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/Code/Claude/projects/bandje-ios/Bandje/SummaryTemplates.json")
+src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "..", "bandje-ios", "Bandje", "SummaryTemplates.json")
 text = open(src, encoding="utf-8").read()
 data = json.loads(text)
 for lang, v in data.items():

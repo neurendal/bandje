@@ -42,6 +42,10 @@ final class Library {
     @ObservationIgnored private var refreshes = 0
     /// True while a job writes into that folder (transcription, summary): no rename or delete then.
     @ObservationIgnored var isBusy: (URL) -> Bool = { _ in false }
+    /// The local staging folder (sync on): finished recordings that could not move into iCloud yet
+    /// stay there and are shown from there (owner, 2026-11-09) until `ICloudSync.flushStaging`
+    /// moves them. Nil: none (tests, the selftest's own folder).
+    @ObservationIgnored var staging: () -> URL? = { ICloudSync.staging }
 
     struct BusyError: LocalizedError {
         var errorDescription: String? { tr("window.busy", "Wacht tot de transcriptie of samenvatting van deze opname klaar is.") }
@@ -53,8 +57,9 @@ final class Library {
     }
 
     /// A folder of its own (tests): known at once.
-    init(root: @escaping () -> URL) {
+    init(root: @escaping () -> URL, staging: URL? = nil) {
         self.root = root
+        self.staging = { staging }
         isRootKnown = { true }
     }
 
@@ -78,21 +83,24 @@ final class Library {
         guard isRootKnown() else { return }
         refreshes += 1
         let mine = refreshes
-        let dir = root()
-        let found = await Task.detached(priority: .userInitiated) { Library.scan(dir) }.value
+        let dir = root(), staging = staging()
+        let found = await Task.detached(priority: .userInitiated) { Library.scan(dir, staging: staging) }.value
         guard mine == refreshes else { return }  // a newer refresh is on its way
         recordings = found
         hasLoaded = true
         makeCovers()
+        backfill(found)
         let (texts, previews) = await Task.detached(priority: .utility) { Library.texts(found) }.value
         guard mine == refreshes else { return }
         searchTexts = texts
         self.previews = previews
     }
 
-    /// Every recording gets its cover in its `.m4a` (a new one after a rename or another colour,
-    /// here or on the iPhone), one at a time in the background. Asked again while busy: another
-    /// round follows with the current list, so the newest title and colour always get their cover.
+    /// Covers in the `.m4a`s, one at a time in the background (`CoverArt.embed`): a new one after a
+    /// rename or another colour made on this Mac (`ownChanges`), and one for a recording that never
+    /// had one. A rename or colour from the iPhone gets its cover there (specs/icloud-sync.md). Asked
+    /// again while busy: another round follows with the current list, so the newest title and colour
+    /// always get their cover.
     private func makeCovers() {
         coversAgain = true
         guard coverTask == nil else { return }
@@ -103,7 +111,8 @@ final class Library {
                 for recording in self?.recordings ?? [] {
                     if Task.isCancelled { return }
                     guard let self, !self.isBusy(recording.folder) else { continue }
-                    await CoverArt.embed(in: recording.folder)
+                    let own = self.ownChanges.remove(recording.folder.standardizedFileURL.path) != nil
+                    await CoverArt.embed(in: recording.folder, own: own)
                     await Task.yield()
                 }
             }
@@ -111,6 +120,42 @@ final class Library {
     }
     @ObservationIgnored private var coverTask: Task<Void, Never>?
     @ObservationIgnored private var coversAgain = false
+    /// Folders whose title or colour this Mac changed itself, waiting for their new cover.
+    @ObservationIgnored private var ownChanges: Set<String> = []
+
+    /// This Mac renamed the recording in `folder` or changed its colour (also a new name when it
+    /// moved into iCloud, " 2"): its cover is made again here (`CoverArt.embed(own:)`).
+    func noteOwnChange(_ folder: URL) {
+        ownChanges.insert(folder.standardizedFileURL.path)
+        makeCovers()
+    }
+
+    /// Older recordings get their length in `.bandje.json` (a hint for the iPhone while the audio is
+    /// still in iCloud there), in the background, one round at a time; folders a job writes to wait.
+    private func backfill(_ recordings: [Recording]) {
+        guard backfillTask == nil else { return }
+        let ready = recordings.filter { !isBusy($0.folder) }
+        backfillTask = Task { [weak self] in
+            _ = await Task.detached(priority: .utility) { Library.backfillDurations(ready) }.value
+            self?.backfillTask = nil
+        }
+    }
+    @ObservationIgnored private var backfillTask: Task<Void, Never>?
+
+    /// Writes `duration` into the `.bandje.json` of each recording that has that file without it,
+    /// when its audio is on this Mac (never downloads). Only that key changes, coordinated (iCloud).
+    /// Never for a recording in progress. Returns the folders written.
+    @discardableResult
+    nonisolated static func backfillDurations(_ recordings: [Recording]) -> [URL] {
+        var written: [URL] = []
+        for r in recordings {
+            guard let meta = RecordingMeta.read(from: r.folder), meta.duration == nil, meta.recording != true,
+                  let audio = r.audio, let seconds = audioDuration(audio),
+                  let stored = RecordingMeta.storedDuration(seconds) else { continue }
+            if (try? RecordingMeta.fillIn(duration: stored, in: r.folder)) == true { written.append(r.folder) }
+        }
+        return written
+    }
 
     /// The transcripts' text per recording folder: everything (for search) and the start (the list).
     nonisolated static func texts(_ recordings: [Recording]) -> (search: [URL: String], previews: [URL: String]) {
@@ -124,20 +169,24 @@ final class Library {
         return (texts, previews)
     }
 
-    /// The recordings in `dir`, newest first. The length comes from the transcript when there is
-    /// one, else from the audio only when it is on this Mac (opening audio that is still in iCloud
-    /// would download it).
-    nonisolated static func scan(_ dir: URL) -> [Recording] {
-        OutputLocation.recordingFolders(in: dir).compactMap { folder -> Recording? in
-            let audio = audioFile(in: folder)
-            let transcript = transcriptFile(in: folder)
-            guard audio != nil || transcript != nil else { return nil }
-            let meta = RecordingMeta.read(from: folder)
-            return Recording(folder: folder, audio: audio, date: OutputLocation.recordingDate(folder.appendingPathComponent("\(folder.lastPathComponent).json")),
-                             duration: duration(transcript: transcript, audio: audio), transcript: transcript,
-                             color: TapeColor(meta?.color), markers: meta?.markers ?? [])
-        }
-        .sorted { $0.date > $1.date }
+    /// The recordings in `dir`, newest first, plus the finished ones in `staging` that are not in
+    /// iCloud yet (`ICloudSync.flushStagingPlan`: never one still being recorded). `dir` is read
+    /// first: a folder that moves into iCloud during the scan is missed once, never shown twice;
+    /// the move's refresh brings it back. The length: `duration(audio:meta:transcript:)`.
+    nonisolated static func scan(_ dir: URL, staging: URL? = nil) -> [Recording] {
+        let folders = OutputLocation.recordingFolders(in: dir)
+        let pending = staging.map { ICloudSync.flushStagingPlan(staging: $0) } ?? []
+        return (folders + pending).compactMap(recording(in:)).sorted { $0.date > $1.date }
+    }
+
+    nonisolated static func recording(in folder: URL) -> Recording? {
+        let audio = audioFile(in: folder)
+        let transcript = transcriptFile(in: folder)
+        guard audio != nil || transcript != nil else { return nil }
+        let meta = RecordingMeta.read(from: folder)
+        return Recording(folder: folder, audio: audio, date: OutputLocation.recordingDate(folder.appendingPathComponent("\(folder.lastPathComponent).json")),
+                         duration: duration(audio: audio, meta: meta, transcript: transcript), transcript: transcript,
+                         color: TapeColor(meta?.color), markers: meta?.markers ?? [])
     }
 
     /// `<folder>/<title>.json` when the recording has been transcribed.
@@ -156,12 +205,28 @@ final class Library {
             ?? audio.sorted { $0.lastPathComponent < $1.lastPathComponent }.first
     }
 
-    nonisolated static func duration(transcript: URL?, audio: URL?) -> TimeInterval {
+    /// A recording's length (as on the iPhone, ../specs/icloud-sync.md): the audio's own when it is
+    /// on this Mac (opening audio that is still in iCloud would download it), else `duration` in
+    /// `.bandje.json`, else the transcript's, else 0. The audio comes first so the `RecordingID` of
+    /// a local recording stays what it was (the transcript's length is the same audio's).
+    nonisolated static func duration(audio: URL?, meta: RecordingMeta?, transcript: URL?) -> TimeInterval {
+        if let audio, let seconds = audioDuration(audio) { return seconds }
+        if let d = meta?.duration, d > 0 { return d }
         if let transcript, let data = try? Files.read(transcript),
            let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let d = o["duration"] as? Double {
             return d
         }
-        guard let audio, isLocal(audio), let file = try? AVAudioFile(forReading: audio), file.fileFormat.sampleRate > 0 else { return 0 }
+        return 0
+    }
+
+    /// The same for the recording in `folder`.
+    nonisolated static func duration(of folder: URL) -> TimeInterval {
+        duration(audio: audioFile(in: folder), meta: RecordingMeta.read(from: folder), transcript: transcriptFile(in: folder))
+    }
+
+    /// The length of `audio` when it is on this Mac and readable, else nil (never downloads).
+    nonisolated static func audioDuration(_ audio: URL) -> TimeInterval? {
+        guard isLocal(audio), let file = try? AVAudioFile(forReading: audio), file.fileFormat.sampleRate > 0, file.length > 0 else { return nil }
         return Double(file.length) / file.fileFormat.sampleRate
     }
 
@@ -238,8 +303,19 @@ final class Library {
         } else {
             try Files.move(folder, to: target)
         }
-        try renameFiles(in: target, from: old, to: name)
+        renameFilesAfterMove(in: target, from: old, to: name)
         return target
+    }
+
+    /// `renameFiles` once the folder itself has moved: the folder is at its new place whatever
+    /// happens to its files, so callers must get that place. A failure is logged, not thrown
+    /// (`audioFile` still finds audio under the old name; the next rename tries again).
+    nonisolated static func renameFilesAfterMove(in folder: URL, from old: String, to new: String) {
+        do {
+            try renameFiles(in: folder, from: old, to: new)
+        } catch {
+            NSLog("Bandje: folder moved, but renaming its files failed: \(error.localizedDescription)")
+        }
     }
 
     /// Renames every file in `folder` that starts with `old` (`<old>.m4a`, `<old>.json`,
@@ -272,24 +348,26 @@ final class Library {
         return count
     }
 
-    /// Gives the recording's cassette `color` (red = the default: no key). A folder without
-    /// `.bandje.json` gets one with its recording date.
+    /// Gives the recording's cassette `color` (red = the default: no key), only that key
+    /// (`RecordingMeta.update`). A folder without `.bandje.json` gets one with its recording date.
     nonisolated static func setColor(_ color: TapeColor, in folder: URL) throws {
-        var meta = RecordingMeta.read(from: folder)
-            ?? RecordingMeta(created: OutputLocation.recordingDate(folder.appendingPathComponent("\(folder.lastPathComponent).json")))
-        meta.color = color.stored
-        try meta.write(to: folder)
+        try RecordingMeta.update(in: folder, created: OutputLocation.recordingDate(folder.appendingPathComponent("\(folder.lastPathComponent).json"))) {
+            $0["color"] = color.stored
+            return true
+        }
     }
 
     func setColor(_ color: TapeColor, of recording: Recording) async throws {
         guard !isBusy(recording.folder) else { throw BusyError() }
         try await Task.detached { try Library.setColor(color, in: recording.folder) }.value
+        ownChanges.insert(recording.folder.standardizedFileURL.path)
         await refresh()
     }
 
     func rename(_ recording: Recording, to title: String) async throws -> Recording {
         guard !isBusy(recording.folder) else { throw BusyError() }
         let folder = try await Task.detached { try Library.renameFolder(recording.folder, to: title) }.value
+        ownChanges.insert(folder.standardizedFileURL.path)
         await refresh()
         return recordings.first { $0.folder.standardizedFileURL == folder.standardizedFileURL }
             ?? Recording(folder: folder, audio: Library.audioFile(in: folder), date: recording.date, duration: recording.duration)

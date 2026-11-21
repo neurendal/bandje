@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import BandjeKit
 import Foundation
 import Testing
 @testable import Bandje
@@ -59,7 +60,42 @@ struct TranscriptTests {
         #expect(TranscriptWriter.searchText(json: url)?.preview.isEmpty == false)
         let text = TranscriptWriter.plainText(t)
         #expect(text.hasPrefix("Interview Anna\n📼 "))
-        #expect(text.contains("\n\n0:00 · Jan\nGoedemiddag, met Jan."))
+        // The marker at 1.5 s falls in Jan's turn: its line comes right after the text, as in the
+        // transcript screen (specs/markers.md 6).
+        #expect(text.contains("\n\n0:00 · Jan\nGoedemiddag, met Jan.\n🚩 0:01\n\n"))
+    }
+
+    /// Markers and notes: kept in the .json, a line under their turn in the .md and the text.
+    @Test func markersAndNotesInTheExports() throws {
+        var t = sample()
+        var m = t.markerSet
+        m.setNote("Actiepunt Jan", at: 4)
+        t.markerSet = m
+        let url = FileManager.default.temporaryDirectory.appending(path: "t-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try TranscriptWriter.write(t, json: url)
+        let back = try TranscriptWriter.read(json: url)
+        #expect(back.markers == [1.5, 4])
+        #expect(back.markerNotes == ["4.0": "Actiepunt Jan"])
+        let md = TranscriptWriter.markdown(t)
+        #expect(md.contains("Goedemiddag, met Jan.\n\n🚩 0:01\n\n**0:03 · \(TranscriptWriter.speakerLabel(1))**"))
+        #expect(md.hasSuffix("\n\n🚩 0:04 Actiepunt Jan\n\n"))
+        // An older transcript without notes reads as before.
+        let old = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+        var stripped = old
+        stripped["markerNotes"] = nil
+        try JSONSerialization.data(withJSONObject: stripped).write(to: url)
+        #expect(try TranscriptWriter.read(json: url).markerNotes.isEmpty)
+    }
+
+    /// In the transcript screen: a flag before the sentence a marker falls in.
+    @Test func markersPlacedAtSentences() {
+        let t = sample()
+        let turns = TranscriptLayout.turns(t)
+        let places = TranscriptBody.markerPlaces(t.markerSet, in: turns)
+        #expect(places.values.flatMap(\.all).sorted() == [1.5, 4])
+        #expect(places[turns[0].id]?.all == [1.5])
+        #expect(places[turns[1].id]?.sentences[0] == [4])
     }
 
     @Test func renamingOneSpeakerRenamesAllTheirTurns() {
@@ -163,5 +199,74 @@ struct TranscriptTests {
         let task = Task { try await Transcriber.shared.transcribe(url, title: "x", speakers: false, markers: []) { _ in } }
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    // MARK: The shared document (specs/share.md)
+
+    @Test func sharedDocumentPutsSummariesBeforeTheTurns() throws {
+        let t = sample()
+        let dir = FileManager.default.temporaryDirectory.appending(path: "share-\(UUID().uuidString)/Interview Anna", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir.deletingLastPathComponent()) }
+        try Data("transcript".utf8).write(to: dir.appending(path: "Interview Anna.md"))  // not a summary
+        let older = dir.appending(path: "Interview Anna samenvatting Vergadering.md")
+        try Data(Summaries.document(title: "Interview Anna", template: "Vergadering", body: "## Kern\nDe afspraak is **verzet**.",
+                                    locale: Locale(identifier: "nl_NL")).utf8).write(to: older)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -60)], ofItemAtPath: older.path)
+        let newer = dir.appending(path: "Interview Anna samenvatting Actiepunten.md")
+        try Data(Summaries.document(title: "Interview Anna", template: "Actiepunten", body: "- Jan belt terug",
+                                    locale: Locale(identifier: "nl_NL")).utf8).write(to: newer)
+
+        // Newest first, as the app shows them; the newest is the one the summary tab shows.
+        let parts = Summaries.parts(in: dir)
+        #expect(parts.map(\.file.lastPathComponent) == [newer.lastPathComponent, older.lastPathComponent])
+        #expect(Summaries.files(in: dir).first == Summaries.file(in: dir))
+        // "Summary · <template>"; the body without the file's heading and metadata line.
+        #expect(parts[0].heading.hasSuffix(" · Actiepunten") && parts[1].heading.hasSuffix(" · Vergadering"))
+        #expect(parts[0].body == "- Jan belt terug")
+        #expect(parts[1].body == "## Kern\nDe afspraak is **verzet**.")
+        #expect(Summaries.part(older, markdown: "Alleen tekst", in: dir).body == "Alleen tekst")
+
+        let text = TranscriptWriter.plainText(t, summaries: parts)
+        #expect(text.hasPrefix("Interview Anna\n"))
+        let first = try #require(text.range(of: parts[0].heading)), second = try #require(text.range(of: "De afspraak"))
+        let turn = try #require(text.range(of: "Goedemiddag, met"))
+        #expect(first.lowerBound < second.lowerBound && second.lowerBound < turn.lowerBound)
+        #expect(!text.contains("Apple Intelligence") && !text.contains("---"))
+        // Plain text: no Markdown marks, bullets as "•", a "Transcript" heading before the turns.
+        #expect(text.contains("• Jan belt terug") && text.contains("Kern\nDe afspraak is verzet.") && !text.contains("**"))
+        #expect(text.contains("\n\n\(String(localized: "Transcript"))\n\n0:00 · "))
+        // Only the summaries: the title block stays, no turns.
+        let onlySummary = TranscriptWriter.plainText(t, summaries: [parts[1]], turns: false)
+        #expect(onlySummary.contains("De afspraak") && !onlySummary.contains("Jan belt") && !onlySummary.contains("Goedemiddag"))
+        #expect(onlySummary.hasPrefix("Interview Anna\n") && !onlySummary.contains("\n\(String(localized: "Transcript"))\n"))
+
+        let md = TranscriptWriter.markdown(t, summaries: parts)
+        #expect(md.hasPrefix("# Interview Anna\n"))
+        #expect(md.contains("## \(parts[0].heading)\n\n- Jan belt terug\n\n---\n\n## \(parts[1].heading)\n\n### Kern"))
+        let mdTurn = try #require(md.range(of: "**0:00")), mdSummary = try #require(md.range(of: "### Kern"))
+        #expect(mdSummary.lowerBound < mdTurn.lowerBound)
+        #expect(md.contains("## \(String(localized: "Transcript"))\n\n**0:00"))
+        #expect(!md.contains("_Template"))
+        let mdOnly = TranscriptWriter.markdown(t, summaries: [parts[0]], turns: false)
+        #expect(!mdOnly.contains("**0:00") && mdOnly.hasSuffix("- Jan belt terug\n"))
+
+        // No summary: exactly the transcript as before.
+        #expect(TranscriptWriter.plainText(t, summaries: []) == TranscriptWriter.plainText(t))
+        #expect(TranscriptWriter.markdown(t, summaries: []) == TranscriptWriter.markdown(t))
+        #expect(Summaries.parts(in: dir.appending(path: "nothing")).isEmpty)
+
+        // The PDF is made with and without the turns.
+        #expect(SharedPDF.pdf(t, summaries: parts).count > 1000)
+        #expect(SharedPDF.pdf(t, summaries: parts, turns: false).count > 1000)
+    }
+
+    @Test func copyThisTurn() {
+        var t = sample()
+        t.speakerNames = [TranscriptWriter.speakerLabel(0): "Jan"]
+        let turns = TranscriptLayout.turns(t)
+        #expect(TranscriptBody.copyText(turns[0], in: t) == "0:00 · Jan\nGoedemiddag, met Jan.")
+        #expect(Summaries.plainText(.paragraph("De afspraak is **verzet**.")) == "De afspraak is verzet.")
+        #expect(Summaries.plainText(.bullet("*Jan* belt")) == "Jan belt")
     }
 }

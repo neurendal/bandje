@@ -8,7 +8,7 @@ Band·je registra due cose insieme: il tuo microfono e tutto l’audio riprodott
 
 - Durante la registrazione la musicassetta nella barra dei menu diventa rossa, le bobine girano e accanto scorre il tempo in rosso.
 - Il Mac non va in stop mentre Band·je registra.
-- La prima volta macOS chiede il permesso di registrare l’audio del Mac. Consentilo, altrimenti Band·je sente solo il tuo microfono.
+- macOS chiede il permesso di registrare l’audio del Mac quando fai clic su **Consenti…** nel benvenuto o in Impostazioni › Accesso, altrimenti alla prima registrazione. Consentilo, altrimenti Band·je sente solo il tuo microfono. All’inizio di ogni registrazione Band·je lo controlla, in silenzio, e ti avvisa subito se è disattivato.
 - Se il microfono resta muto per sei secondi, o se chiudi il coperchio mentre usi il microfono integrato, Band·je ti avvisa e propone di passare a un altro microfono.
 
 Avvisa gli altri che stai registrando. In alcuni paesi, e per uso lavorativo, è obbligatorio per legge, e a volte serve anche il loro consenso. Sei responsabile del rispetto della legge che ti riguarda. Band·je te lo ricorda una volta, prima della prima registrazione.
@@ -50,33 +50,30 @@ Su una linea telefonica con un menu o una musica d’attesa, a volte Band·je se
 ## La finestra di Band·je {#player}
 Tutte le tue registrazioni in un’unica finestra: ascolta, segui il testo, cerca, nomina i parlanti, riassumi e condividi.
 
-Scegli **Apri Band·je** nel menu (⌘O). La finestra si apre anche quando avvii Band·je tu stesso, ad esempio da Launchpad o Spotlight. **Apri in Band·je** apre la registrazione attuale. Mentre la finestra è aperta, Band·je è nel Dock e in ⌘Tab; chiudila e Band·je torna solo nella barra dei menu. Attiva **Sempre nel Dock** in [Impostazioni](#settings) per tenere l’icona. La prima volta la finestra si apre sempre, con i permessi, ognuno con il suo pulsante. Se chiudi la finestra, Band·je resta nella barra dei menu; esci da Band·je da quel menu.
+Scegli **Apri Band·je** nel menu (⌘O). La finestra si apre anche quando avvii Band·je tu stesso, ad esempio da Launchpad o Spotlight. **Apri in Band·je** apre la registrazione attuale. Mentre la finestra è aperta, Band·je è nel Dock e in ⌘Tab; chiudila e Band·je torna solo nella barra dei menu. Attiva **Sempre nel Dock** in [Impostazioni](#settings) per tenere l’icona. La prima volta la finestra si apre sempre con un benvenuto in due passi: prima le scorciatoie, poi con **Avanti** i permessi, ognuno con il suo pulsante. Se chiudi la finestra, Band·je resta nella barra dei menu; esci da Band·je da quel menu.
 
 - A sinistra: le tue registrazioni per giorno, con l’ora, la durata e le prime parole della trascrizione. La ricerca trova titoli e parole nelle trascrizioni. In basso c’è **Avvia registrazione**; durante la registrazione la nuova registrazione è in cima con un punto rosso e, quando ti fermi, la finestra la apre.
 - A destra: la registrazione con la musicassetta, la barra di avanzamento e il pulsante di riproduzione (Spazio). Fai clic su una frase per ascoltare da lì; durante la riproduzione la frase che senti si illumina e la trascrizione la segue. **Cerca nella trascrizione** (⌘F) trova le parole.
 - Accanto a **Trascrizione** c’è la scheda **Riassunto**. Se non c’è ancora un riassunto, contiene **Riassumi**: scegli un modello, vedi [Riassunti](#summaries). Ogni riassunto ha la sua scheda; **Un altro riassunto** ne crea un altro.
 - Non c’è ancora una trascrizione (ad esempio una registrazione dal tuo iPhone)? Fai clic su **Trascrivi**.
-- **Condividi**: **Audio…**, **Trascrizione (.md)…**, **Trascrizione in PDF…** o **Pagina web con audio…**: un unico file con il lettore, la trascrizione, i riassunti e l’audio, che funziona in qualsiasi browser, anche offline. **Pagina web con audio, compatta (per email)…** rende l’audio più piccolo. La pagina ha un link a band.je e nient’altro.
-- Su carta: **Stampa…** (⌘P, o in **Condividi**) stampa la trascrizione, come il PDF.
+- **Condividi**: **Audio…** e **Pagina audio…** condividono la registrazione. **Condividi come…**, **Copia come…** e **Salva come…** chiedono prima **PDF**, **Testo** o **Markdown** e sono un unico documento: prima i riassunti, poi la trascrizione. Con i riassunti spunti anche cosa includere (è tutto spuntato). **Salva come…** lo salva dove vuoi, **Copia come…** lo mette negli appunti. **Pagina audio…** è un unico file con il lettore, la trascrizione, i riassunti e l’audio, che funziona in qualsiasi browser, anche offline. **Pagina audio, compatta (per e-mail)…** rende l’audio più piccolo. La pagina ha un link a band.je e nient’altro.
+- Su carta: **Stampa…** (⌘P, o in **Condividi**) stampa lo stesso documento del PDF.
+- Copiare: **Copia** accanto a un riassunto mette il suo testo negli appunti. Puoi anche selezionare del testo e premere ⌘C.
 - **Altro**: **Nome e colore…** (o fai clic sul titolo sulla musicassetta): il nome e il colore della musicassetta, **Nomina parlanti…**, **Mostra nel Finder**, **Elimina…** (nel Cestino).
 - Puoi eliminare una registrazione anche dall’elenco: fai clic destro su di essa e scegli **Elimina…**, oppure selezionala e premi ⌫. Band·je chiede prima conferma.
 
 ## Dettatura {#dictation}
-Premi ⌃⌥⌘D, parla e il testo appare dove si trova il cursore: in una chat, un’email, un editor o Terminal.
+Premi ⌃⌥⌘D, parla e il tuo testo è negli Appunti. Incollalo con ⌘V dove si trova il cursore: in una chat, un’email, un editor o Terminal.
 
 Puoi usare l’abbreviazione in due modi:
 
 - **Premi brevemente** ⌃⌥⌘D: Band·je ascolta finché non premi Return, o di nuovo ⌃⌥⌘D. Il Return non viene inviato all’app.
-- **Tieni premuto** ⌃⌥⌘D: Band·je ascolta finché tieni premuti i tasti e incolla quando li rilasci.
+- **Tieni premuto** ⌃⌥⌘D: Band·je ascolta finché tieni premuti i tasti e mette il testo negli Appunti quando li rilasci.
 
 Premi Esc per annullare. Mentre Band·je ascolta, l’icona nella barra dei menu diventa arancione, con il tempo accanto. Una dettatura può durare fino a cinque minuti; negli ultimi 30 secondi il tempo lampeggia.
 
 ### Incollare
-Il testo è sempre negli Appunti. Per incollarlo al posto tuo, Band·je ha bisogno del permesso di inviare una pressione di tasti (⌘V): scegli **Attiva incolla automatico…** nel menu, oppure vai in Impostazioni di Sistema > Privacy e sicurezza > Accessibilità e attiva Band·je. Senza questo permesso incolli tu con ⌘V.
-
-macOS comunica questo permesso a Band·je solo dopo un riavvio. L’hai appena attivato? Scegli **Riavvia Band·je per l'incolla automatico** nel menu, oppure **Riavvia Band·je** in [Impostazioni](#settings).
-
-Se senti un breve suono invece dell’incolla, un campo password o un’altra app ha attivato l’inserimento sicuro (Inserimento sicuro da tastiera di Terminal, un gestore di password). macOS blocca allora l’incolla; il testo è negli Appunti, quindi premi tu ⌘V.
+Dopo la dettatura, il testo è negli Appunti e accanto alla cassetta compare per un attimo ⌘V. Premi ⌘V per incollarlo dove si trova il cursore. Il testo resta negli Appunti finché non copi qualcos’altro, quindi puoi anche incollarlo più tardi o in più punti.
 
 Niente di ciò che detti viene salvato.
 
@@ -170,7 +167,25 @@ Fai clic su **Modifica…** e scegli una cartella, ovunque sul Mac o su un disco
 Se la cartella è in iCloud Drive, Dropbox o un altro servizio cloud (anche Scrivania e Documenti quando sono in iCloud), Band·je ti avvisa: le registrazioni lasciano allora il Mac tramite quel servizio.
 
 ### Accesso
-Se Band·je può usare il microfono, incollare per te e registrare l’audio del tuo Mac, ciascuno con il suo pulsante (**Consenti…** o **Apri impostazioni…**). Un segno di spunta verde significa consentito; lo stato si aggiorna da solo quando torni da Impostazioni di Sistema. Vedi [Risoluzione dei problemi](#troubleshooting).
+Se Band·je può usare il microfono e registrare l’audio del tuo Mac, ciascuno con il suo pulsante (**Consenti…** o **Apri impostazioni…**). Un segno di spunta verde significa consentito; lo stato si aggiorna da solo quando torni da Impostazioni di Sistema. Vedi [Risoluzione dei problemi](#troubleshooting).
+
+## Band·je Illimitato {#purchases}
+Cosa è gratuito, cosa sbloccano i due acquisti e come ripristinarli (Band·je dall’App Store).
+
+Band·je è gratuito. Registrare è sempre gratuito e senza limiti.
+
+- **Trascrivere** è gratuito per le tue prime 5 registrazioni. Una registrazione conta una volta, quando la sua prima trascrizione è finita; trascriverla di nuovo è gratuito.
+- **Dettare** è gratuito per 15 minuti di audio dettato in totale. Una dettatura in corso quando i minuti finiscono termina normalmente. Dopo 10 minuti Band·je ti dice una volta quanti minuti gratuiti restano; lo mostra anche il menu nella barra dei menu.
+- Quello che hai già resta tuo: trascrizioni, riassunti, condivisione ed esportazione non vengono mai bloccati. I riassunti sono gratuiti su ogni trascrizione.
+
+Due acquisti, ognuno pagato una volta sola, nessun abbonamento:
+
+- **Band·je Illimitato**: trascrizione e dettatura senza limiti.
+- **Band·je Dettatura**: dettatura senza limiti.
+
+Acquistali in **Impostazioni… › Acquisti**, oppure scegli **Acquista Band·je Illimitato…** nel menu Band·je mentre la finestra è aperta. Finite le trascrizioni gratuite, **Trascrivi** mostra prima Band·je Illimitato; una trascrizione automatica non parte, e la registrazione lo dice.
+
+Se hai acquistato Band·je prima che diventasse gratuito, è tutto sbloccato senza fare nulla. Un acquisto vale su ogni Mac, iPhone e iPad con lo stesso Account Apple, e con In famiglia. Su un altro Mac scegli **Ripristina acquisti**. La parte gratuita si conta per dispositivo. La finestra di benvenuto dice cosa è gratis, con **Già acquistato? Ripristina acquisti**.
 
 ## Privacy e rete {#privacy}
 Audio, trascrizioni e riassunti non lasciano mai il tuo Mac.
@@ -199,15 +214,14 @@ Soluzioni per ciò che può andare storto.
 Molti problemi dipendono da un’autorizzazione mancante. Scegli **Impostazioni…** e guarda in **Accesso**:
 
 - **Microfono**: serve per registrare la tua voce e per dettare.
-- **Suono del Mac**: serve per registrare l’interlocutore. macOS non permette alle app di leggere questa autorizzazione, quindi Band·je mostra cosa è successo nell’ultima registrazione: è arrivato del suono oppure c’era silenzio. Il silenzio è normale se non suonava nulla.
-- **Incolla automatico**: serve per incollare al posto tuo il testo dettato.
+- **Suono del Mac**: serve per registrare l’interlocutore. macOS non permette alle app di leggere questa autorizzazione, quindi Band·je lo controlla da sé: riproduce per mezzo secondo un segnale impercettibile che non raggiunge mai i tuoi altoparlanti o AirPods, e guarda se arriva. **Consenti…** fa chiedere a macOS; dopo **Apri impostazioni…** il segno di spunta compare appena hai attivato Band·je.
 
 Un segno di spunta verde significa consentito. Altrimenti fai clic su **Apri impostazioni…**, attiva Band·je e torna; Band·je se ne accorge da solo.
 
-A ogni avvio Band·je controlla il microfono e l’incolla automatico e ti avvisa se manca qualcosa. Non ti serve l’incolla automatico? Seleziona **Non mostrare più questo messaggio**, oppure disattiva **Avvisa all’avvio se manca qualcosa** in Accesso.
+A ogni avvio Band·je controlla il microfono, e il suono del Mac se era disattivato, e ti avvisa se manca qualcosa. Non vuoi l’avviso? Seleziona **Non mostrare più questo messaggio**, oppure disattiva **Avvisa all’avvio se manca qualcosa** in Accesso.
 
 ### Nella registrazione manca l’interlocutore
-macOS non ha permesso a Band·je di registrare l’audio del Mac. Vai in Impostazioni di Sistema > Privacy e sicurezza > Registrazione schermo e audio di sistema e attiva Band·je in Solo registrazione audio di sistema.
+macOS non ha permesso a Band·je di registrare l’audio del Mac. Band·je te lo segnala all’inizio di una registrazione. Vai in Impostazioni di Sistema > Privacy e sicurezza > Registrazione schermo e audio di sistema e attiva Band·je in Solo registrazione audio di sistema. Subito dopo non funziona ancora? Riavvia Band·je.
 
 ### Manca la mia voce
 Controlla il menu **Microfono**. Con il coperchio chiuso il microfono integrato è spento: scegline un altro. Se Band·je non può usare affatto il microfono, attivalo in Impostazioni di Sistema > Privacy e sicurezza > Microfono.

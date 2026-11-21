@@ -26,17 +26,63 @@ struct SummaryTests {
         #expect(!ReviewPrompt.shouldAsk(defaults: d, version: "1.2.0", automated: false))  // after the 10th: no more
     }
 
+    /// The later example comes once in total, in one language: another app language (a run with
+    /// -AppleLanguages, a language switch in Settings) adds nothing next to it.
+    @Test func laterExampleComesOnceInOneLanguage() throws {
+        func names(_ dir: URL) -> [String] {
+            ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).sorted()
+        }
+        let root = FileManager.default.temporaryDirectory.appending(path: "bandje-later-\(UUID().uuidString)")
+        // A fresh folder in English: only the English examples, and a later Dutch launch adds nothing.
+        let fresh = root.appending(path: "Fresh")
+        let d1 = UserDefaults(suiteName: "bandje-test-\(UUID().uuidString)")!
+        Summaries.seedIfMissing(fresh, language: "en", defaults: d1)
+        Summaries.addLaterExamples(in: fresh, language: "en", defaults: d1)
+        let english = Summaries.examples(language: "en").map { $0.name + ".md" }.sorted()
+        #expect(names(fresh) == english)
+        Summaries.seedIfMissing(fresh, language: "nl", defaults: d1)
+        Summaries.addLaterExamples(in: fresh, language: "nl", defaults: d1)
+        #expect(names(fresh) == english)
+
+        // An existing folder: a launch in English, then in Dutch and German: only the English one.
+        let existing = root.appending(path: "Existing")
+        try FileManager.default.createDirectory(at: existing, withIntermediateDirectories: true)
+        try Data("own".utf8).write(to: existing.appending(path: "Mine.md"))
+        let d2 = UserDefaults(suiteName: "bandje-test-\(UUID().uuidString)")!
+        Summaries.addLaterExamples(in: existing, language: "en", defaults: d2)
+        #expect(names(existing) == ["Generic summary.md", "Mine.md"])
+        Summaries.addLaterExamples(in: existing, language: "nl", defaults: d2)
+        Summaries.addLaterExamples(in: existing, language: "de", defaults: d2)
+        #expect(names(existing) == ["Generic summary.md", "Mine.md"])
+
+        // Language switch with the example already there in another language (flags not on this
+        // device, e.g. it came from the Mac through iCloud): nothing new, also after deleting it.
+        let synced = root.appending(path: "Synced")
+        try FileManager.default.createDirectory(at: synced, withIntermediateDirectories: true)
+        try Data("## X".utf8).write(to: synced.appending(path: "Algemene samenvatting.md"))
+        let d3 = UserDefaults(suiteName: "bandje-test-\(UUID().uuidString)")!
+        Summaries.addLaterExamples(in: synced, language: "en", defaults: d3)
+        #expect(names(synced) == ["Algemene samenvatting.md"])
+        try FileManager.default.removeItem(at: synced.appending(path: "Algemene samenvatting.md"))
+        Summaries.addLaterExamples(in: synced, language: "fr", defaults: d3)
+        #expect(names(synced).isEmpty)
+        #expect(Summaries.laterExamples.allSatisfy { d3.bool(forKey: "templateAdded.\($0)") })
+    }
+
     /// Templates as files, as on the Mac: examples once, own files win, names from file names,
     /// one summary file per template and the newest one shown.
     @Test func templatesAndSummaryFiles() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "bandje-templates-\(UUID().uuidString)")
         let folder = root.appending(path: "Templates")
         #expect(Summaries.templates(in: folder, language: "nl").map(\.name) == ["Vergadering", "Sollicitatiegesprek", "Klantinterview (productvalidatie)", "Algemene samenvatting"])
-        Summaries.seedIfMissing(folder, language: "nl")
+        let seeded = UserDefaults(suiteName: "bandje-test-\(UUID().uuidString)")!
+        Summaries.seedIfMissing(folder, language: "nl", defaults: seeded)
         #expect(Summaries.templates(in: folder, language: "nl").count == 4)
         Summaries.deleteTemplate("Sollicitatiegesprek", in: folder)
         Summaries.deleteTemplate("Algemene samenvatting", in: folder)
-        Summaries.seedIfMissing(folder, language: "nl")  // an existing folder stays as it is
+        Summaries.seedIfMissing(folder, language: "nl", defaults: seeded)  // an existing folder stays as it is
+        #expect(Summaries.templates(in: folder, language: "nl").count == 2)
+        Summaries.addLaterExamples(in: folder, language: "nl", defaults: seeded)  // a seeded folder had it already
         #expect(Summaries.templates(in: folder, language: "nl").count == 2)
         // A later example arrives once in an existing folder, and not again after deleting it.
         let defaults = UserDefaults(suiteName: "bandje-test-\(UUID().uuidString)")!

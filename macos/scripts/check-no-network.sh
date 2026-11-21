@@ -21,11 +21,13 @@ echo "1/6 Source scan (our code only)"
 PATTERN='URLSession|URLRequest|NSURLConnection|import Network|NWConnection|NWListener|NWBrowser|CFSocket|CFStream|socket\(|getaddrinfo|WKWebView|import WebKit|https?://|SUFeedURL|Sparkle|Firebase|Sentry|Analytics|TelemetryDeck|import ScreenCaptureKit|SCStream|CGWindowList|\.download\(|import CloudKit|CKContainer|CKDatabase|PrivateCloudCompute'
 # The only URLs allowed are the three About links (they open the browser; akkoord 2026-11-05).
 ABOUT_LINKS='^Sources/Bandje/About\.swift:[0-9]+:.*URL\(string: "https://((neurendal|desertant)\.com|band\.je)"\)!$'
+# band.je in the app's language: the same host, only a path from BandjeKit's SitePath after it (owner, 2026-11-12).
+ABOUT_SITE='^Sources/Bandje/About\.swift:[0-9]+:.*URL\(string: "https://band\.je" \+ SitePath\.path\([A-Za-z:, ]*\)\)!$'
 # The shared web page (WebExport.swift) links to band.je, and only there (owner, 2026-11-06).
 EXPORT_LINK='^Sources/Bandje/WebExport\.swift:[0-9]+:.*"https://band\.je/?"'
 # The SVG namespace in the icon's layers (Resources/AppIcon.icon) is an identifier, not a link: it is
 # blanked before the second match, so any other URL on such a line still fails.
-if grep -rnE "$PATTERN|PrivateCloudComputeLanguageModel" Sources Resources 2>/dev/null | grep -vE '^\S+:[0-9]+:\s*//' | grep -vE "$ABOUT_LINKS" | grep -vE "$EXPORT_LINK" \
+if grep -rnE "$PATTERN|PrivateCloudComputeLanguageModel" Sources Resources 2>/dev/null | grep -vE '^\S+:[0-9]+:\s*//' | grep -vE "$ABOUT_LINKS" | grep -vE "$ABOUT_SITE" | grep -vE "$EXPORT_LINK" \
    | sed -E 's#(xmlns="http://www\.w3\.org/2000/svg")##' | grep -E "$PATTERN|PrivateCloudComputeLanguageModel"; then
   red "  Forbidden API, URL or download call in our code (see above)"; fail=1
 else
@@ -38,7 +40,8 @@ if [ -f Package.swift ]; then
   if [ -z "$deps" ]; then
     green "  None"
   else
-    other=$(echo "$deps" | grep -v "$ALLOWED_DEP" || true)
+    # The only other package: the shared BandjeKit by local path (checked by its own script below).
+    other=$(echo "$deps" | grep -v "$ALLOWED_DEP" | grep -vE '\.package\(path: "\.\./bandje-core"\)' || true)
     if [ -n "$other" ]; then
       red "  Dependency other than $ALLOWED_DEP:"; echo "$other"; fail=1
     fi
@@ -63,6 +66,13 @@ if [ -f Package.swift ]; then
   fi
 fi
 
+# BandjeKit (../bandje-core) is linked into the app: its own check (no URLs, no dependencies).
+if [ -x ../bandje-core/scripts/check-no-network.sh ]; then
+  ../bandje-core/scripts/check-no-network.sh | sed 's/^/  /' ; [ "${PIPESTATUS[0]}" -eq 0 ] || fail=1
+else
+  red "  ../bandje-core/scripts/check-no-network.sh not found (bandje-core must sit next to this repo)"; fail=1
+fi
+
 if [ ! -d "$APP" ]; then
   red "3-6 skipped: $APP not found, run 'make app' first"; exit 1
 fi
@@ -78,7 +88,7 @@ else
   green "  No network entitlement"
 fi
 
-# iCloud: only iCloud Documents (iCloud Drive, opt-in sync), never CloudKit (CLAUDE.md, limit 8).
+# iCloud: only iCloud Documents (iCloud Drive, opt-in sync), never CloudKit.
 if echo "$ENT" | grep -A3 'com.apple.developer.icloud-services' | grep -q 'CloudKit'; then
   red "  iCloud service CloudKit present: only CloudDocuments is allowed"; fail=1
 elif echo "$ENT" | grep -q 'com.apple.developer.icloud-services'; then

@@ -1,6 +1,7 @@
 // Ported from the iPhone app (bandje-ios Bandje/Cassette.swift); keep the two in step.
 import AppKit
 import AVFoundation
+import BandjeKit
 import SwiftUI
 
 /// Everything the cassette shows. One value drives both the drawing and the motion, so the
@@ -430,10 +431,12 @@ extension Color {
             : NSColor(srgbRed: 0xD2 / 255, green: 0x44 / 255, blue: 0x2A / 255, alpha: 0.18)
     })
     /// band.je navy (rgb 38, 43, 79): the selection in the window instead of the system's accent
-    /// (owner). In dark a lighter navy, else it disappears against the dark sidebar.
+    /// (owner). In dark a steel-blue navy #5B72A8: as tint it is also the colour of text buttons and
+    /// icons, which #3D4478 made unreadable, and #7078C4 turned lilac (owner, 2026-11-12); white on
+    /// it stays readable.
     static let navy = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(srgbRed: 0x3D / 255, green: 0x44 / 255, blue: 0x78 / 255, alpha: 1)
+            ? NSColor(srgbRed: 0x5B / 255, green: 0x72 / 255, blue: 0xA8 / 255, alpha: 1)
             : NSColor(srgbRed: 0x26 / 255, green: 0x2B / 255, blue: 0x4F / 255, alpha: 1)
     })
     /// Ink on `brand` (--btnInk): white in light, #1C1C1E in dark.
@@ -511,32 +514,57 @@ struct CoverArt: View {
 
     /// Folders being done right now (after a recording and a library refresh at the same time).
     @MainActor private static var working: Set<URL> = []
+    /// The keys tried per folder in this session. Each try changes the folder (the cover file, the
+    /// audio), which refreshes the library, which tries again: a try that failed, or one after
+    /// which the key still differs, would rewrite the audio in a loop. So a key is tried once.
+    @MainActor private static var tried: [URL: Set<String>] = [:]
 
-    /// Makes the cover for the recording in `folder` when its title, length or colour changed, and
-    /// puts it (and the title) into the `.m4a`: passthrough (the audio is not re-encoded), written
-    /// next to it and swapped in. Audio still in iCloud, or not `.m4a`, is left as it is.
-    @MainActor static func embed(in folder: URL) async {
+    /// Makes the cover for the recording in `folder` and puts it (and the title) into the `.m4a`:
+    /// passthrough (the audio is not re-encoded), written next to it and swapped in. Only when
+    /// `CoverPolicy.plan` says so (specs/icloud-sync.md, owner 2026-11-10): for a change this Mac made
+    /// itself (`own`: its new recording, its rename or colour), or for a recording that never had a
+    /// cover; never as a reaction to a rename or colour from the iPhone (the iPhone writes that cover),
+    /// and only while `.bandje.json` and the audio are the newest versions. Own change, audio not
+    /// here: the key is removed, so a device that has the audio makes the cover. Not `.m4a`: nothing.
+    @MainActor static func embed(in folder: URL, own: Bool) async {
         let folder = folder.standardizedFileURL
         guard !working.contains(folder),
-              let audio = Library.audioFile(in: folder), audio.pathExtension.lowercased() == "m4a", Library.isLocal(audio)
+              let audio = Library.audioFile(in: folder), audio.pathExtension.lowercased() == "m4a"
         else { return }
         working.insert(folder)
         defer { working.remove(folder) }
-        let duration = await Task.detached(priority: .utility) { Library.duration(transcript: nil, audio: audio) }.value
-        var meta = RecordingMeta.read(from: folder)
-            ?? RecordingMeta(created: OutputLocation.recordingDate(folder.appendingPathComponent("\(folder.lastPathComponent).json")))
-        let title = folder.lastPathComponent, color = TapeColor(meta.color)
+        let metaFile = RecordingMeta.url(in: folder)
+        let audioIsCurrent = CoverPolicy.isUpToDate(audio)
+        let duration = await Task.detached(priority: .utility) { Library.duration(of: folder) }.value
+        let meta = RecordingMeta.read(from: folder)
+        let title = folder.lastPathComponent, color = TapeColor(meta?.color)
         let key = key(title: title, duration: duration, color: color)
-        guard duration > 0, meta.coverKey != key,
+        let created = OutputLocation.recordingDate(folder.appendingPathComponent("\(title).json"))
+        switch CoverPolicy.plan(storedKey: meta?.coverKey, currentKey: key, ownChange: own,
+                                metaIsCurrent: CoverPolicy.isUpToDate(metaFile), audioIsCurrent: audioIsCurrent && duration > 0) {
+        case .leave:
+            return
+        case .clearKey:
+            _ = try? await Task.detached {
+                try RecordingMeta.update(in: folder, onlyIfCurrent: true) { $0.removeValue(forKey: "coverKey") != nil }
+            }.value
+            return
+        case .embed:
+            break
+        }
+        guard tried[folder, default: []].insert(key).inserted,
               let art = jpeg(title: title, duration: duration, color: color) else { return }
         let cover = folder.appendingPathComponent(".cover-\(key).jpg")
         let temp = folder.appendingPathComponent(".embedding-\(UUID().uuidString).m4a")
+        /// A new cover file that didn't make it into the audio goes again (an older one stays).
+        func dropCover() { if meta?.coverKey != key { try? FileManager.default.removeItem(at: cover) } }
+        var embedded = false
         do {
-            for file in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] where file.hasPrefix(".cover-") {
-                try? FileManager.default.removeItem(at: folder.appendingPathComponent(file))
-            }
             try Files.write(art, to: cover)
-            guard let session = AVAssetExportSession(asset: AVURLAsset(url: audio), presetName: AVAssetExportPresetPassthrough) else { return }
+            guard let session = AVAssetExportSession(asset: AVURLAsset(url: audio), presetName: AVAssetExportPresetPassthrough) else {
+                dropCover()
+                return
+            }
             let artwork = AVMutableMetadataItem()
             artwork.identifier = .iTunesMetadataCoverArt
             artwork.dataType = kCMMetadataBaseDataType_JPEG as String
@@ -546,12 +574,33 @@ struct CoverArt: View {
             name.value = title as NSString
             session.metadata = [artwork, name]
             try await session.export(to: temp, as: .m4a)
+            // The export takes a while: a newer `.bandje.json` or audio from the iPhone that started
+            // coming meanwhile wins, this cover is dropped.
+            guard CoverPolicy.isUpToDate(metaFile), CoverPolicy.isUpToDate(audio) else {
+                try? FileManager.default.removeItem(at: temp)
+                dropCover()
+                return
+            }
             try Files.replace(audio, with: temp)
-            meta.coverKey = key
-            try meta.write(to: folder)
-            AudioPlayer.shared.coverChanged(in: folder)
+            embedded = true
+            for file in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            where file.hasPrefix(".cover-") && file != cover.lastPathComponent {
+                try? FileManager.default.removeItem(at: folder.appendingPathComponent(file))
+            }
+            // Only the key, into the file as it is now: the export takes a while, and a colour chosen
+            // meanwhile (the rename sheet sets it after the new name) must stay. The key then still
+            // names this cover's colour, so the next round (an own change) makes the cover in the new
+            // one. Coordinated, so off the main queue (where the window's FolderPresenter answers).
+            _ = try await Task.detached {
+                try RecordingMeta.update(in: folder, created: created, onlyIfCurrent: true) {
+                    $0["coverKey"] = key
+                    return true
+                }
+            }.value
+            Playback.coverChanged(in: folder)
         } catch {
             try? FileManager.default.removeItem(at: temp)
+            if !embedded { dropCover() }
             NSLog("Bandje: cover not embedded: \(error.localizedDescription)")
         }
     }

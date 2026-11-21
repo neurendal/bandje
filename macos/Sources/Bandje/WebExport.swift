@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import BandjeKit
 import Foundation
 import SwiftUI
 
@@ -19,7 +20,7 @@ enum WebExport {
         return count > 1 ? "\(word) · \(template)" : word
     }
 
-    /// The only URL in our code besides the About links (CLAUDE.md limit 1, owner 2026-11-06).
+    /// The only URL in our code besides the About links.
     static let siteURL = "https://band.je"
 
     /// Summaries next to `json`: `<base> <word> <template>.md` (any word, so a summary made in
@@ -43,7 +44,8 @@ enum WebExport {
     /// Writes the page for the transcript at `json` to a temporary file named after the recording,
     /// for the share sheet. `compact`: the audio as mono speech at 32 kbit/s (~19 MB per hour).
     static func export(json: URL, compact: Bool) async throws -> URL {
-        let t = try TranscriptWriter.read(json: json)
+        // The folder's markers now (the transcript's copy may be older: changed on another device).
+        let t = TranscriptWriter.withFolderMarkers(try TranscriptWriter.read(json: json), json: json)
         let folder = json.deletingLastPathComponent()
         var audio: (base64: String, type: String)?
         // Only a file in this folder (a synced json could name any path), else the folder's own audio.
@@ -55,7 +57,8 @@ enum WebExport {
         }
         let logo = OutputLocation.bundledLogo.flatMap { try? Data(contentsOf: $0) }?.base64EncodedString()
         let html = page(t, summaries: summaries(for: json), audio: audio, logoBase64: logo)
-        removeOldPages()
+        // Pages made more than a day ago (the share sheet has long copied them), as at launch.
+        OutputLocation.removeLeftovers(recordingDirs: [], temp: FileManager.default.temporaryDirectory, age: 86_400)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("Bandje-share-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent(OutputLocation.safeName(json.deletingPathExtension().lastPathComponent) + ".html")
@@ -74,25 +77,15 @@ enum WebExport {
         }
     }
 
-    /// Pages made more than a day ago (the share sheet has long copied them).
-    static func removeOldPages() {
-        let tmp = FileManager.default.temporaryDirectory
-        let old = Date().addingTimeInterval(-86_400)
-        for item in (try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.creationDateKey])) ?? []
-        where item.lastPathComponent.hasPrefix("Bandje-share-") {
-            if let created = try? item.resourceValues(forKeys: [.creationDateKey]).creationDate, created < old {
-                try? FileManager.default.removeItem(at: item)
-            }
-        }
-    }
-
     /// The recording as AAC mono 22.05 kHz at 32 kbit/s: speech stays clear, an hour is ~14 MB.
     /// Written with ExtAudioFile: AVAudioFile ignores the bitrate (it gives ~58 kbit/s).
     static func compactAudio(_ source: URL) async throws -> Data {
         try await Task.detached(priority: .userInitiated) {
             let input = try AVAudioFile(forReading: source)
-            let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 22_050, channels: 1, interleaved: false)!
-            guard let converter = AVAudioConverter(from: input.processingFormat, to: mono) else { throw CocoaError(.fileWriteUnknown) }
+            guard let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 22_050, channels: 1, interleaved: false),
+                  let converter = AVAudioConverter(from: input.processingFormat, to: mono),
+                  let inBuffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: 32_768)
+            else { throw CocoaError(.fileWriteUnknown) }
             // Mix both channels: without this the converter keeps only the left one (me), not the other side.
             converter.downmix = true
             let target = FileManager.default.temporaryDirectory.appendingPathComponent("compact-\(UUID().uuidString).m4a")
@@ -122,27 +115,33 @@ enum WebExport {
                 }
             }
 
-            let inBuffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: 32_768)!
             let ratio = mono.sampleRate / input.processingFormat.sampleRate
-            // `read` throws at the end of the file instead of returning 0 frames: stop before it.
-            while input.framePosition < input.length {
-                try input.read(into: inBuffer)
-                if inBuffer.frameLength == 0 { break }
-                let outBuffer = AVAudioPCMBuffer(pcmFormat: mono, frameCapacity: AVAudioFrameCount(Double(inBuffer.frameLength) * ratio) + 1024)!
+            /// Converts `buffer` (nil: the end of the stream, which flushes the resampler's last
+            /// samples) and writes what comes out.
+            func convert(_ buffer: AVAudioPCMBuffer?) throws {
+                let frames = AVAudioFrameCount(Double(buffer?.frameLength ?? 0) * ratio) + 1024
+                guard let outBuffer = AVAudioPCMBuffer(pcmFormat: mono, frameCapacity: frames) else { throw CocoaError(.fileWriteUnknown) }
                 var fed = false
                 var error: NSError?
                 converter.convert(to: outBuffer, error: &error) { _, state in
-                    if fed { state.pointee = .noDataNow; return nil }
+                    guard let buffer, !fed else {
+                        state.pointee = buffer == nil ? .endOfStream : .noDataNow
+                        return nil
+                    }
                     fed = true
                     state.pointee = .haveData
-                    return inBuffer
+                    return buffer
                 }
                 if let error { throw error }
                 if outBuffer.frameLength > 0 {
-                    status = ExtAudioFileWrite(out, outBuffer.frameLength, outBuffer.audioBufferList)
+                    let status = ExtAudioFileWrite(out, outBuffer.frameLength, outBuffer.audioBufferList)
                     guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
                 }
             }
+            // readNext (BandjeKit): false at the end, also when the file promised a few frames
+            // more than it holds (AAC taken out of a video).
+            while try input.readNext(into: inBuffer) { try convert(inBuffer) }
+            try convert(nil)
             status = ExtAudioFileDispose(out)  // finishes the file
             disposed = true
             guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
@@ -156,12 +155,19 @@ enum WebExport {
     /// above a red rule, the title, the header lines, then per turn the time and speaker in grey with
     /// the text under it. Every page has a footer: made with Band·je, and "n / N". Made on this Mac
     /// when shared; `cassette` is rendered by the caller (SwiftUI, main actor).
-    static func pdf(_ t: Transcript, locale: Locale = TranscriptWriter.appLocale, cassette: NSImage? = nil) -> Data {
+    /// `summaries` (Share › PDF and Print, specs/share.md): each under its heading after the header
+    /// lines, then "Transcript" above the turns; `turns` false leaves the turns out.
+    static func pdf(_ t: Transcript, locale: Locale = TranscriptWriter.appLocale, cassette: NSImage? = nil,
+                    summaries: [Summary] = [], turns includeTurns: Bool = true) -> Data {
         let text = NSMutableAttributedString()
-        func add(_ string: String, _ font: NSFont, _ color: NSColor = .black, after: CGFloat = 0) {
+        func add(_ string: String, _ font: NSFont, _ color: NSColor = .black, after: CGFloat = 0, indent: CGFloat = 0) {
             let style = NSMutableParagraphStyle()
             style.paragraphSpacing = after
             style.lineSpacing = 2
+            if indent > 0 {
+                style.headIndent = indent
+                style.tabStops = [NSTextTab(textAlignment: .left, location: indent)]
+            }
             text.append(NSAttributedString(string: string + "\n", attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style]))
         }
         let grey = NSColor(white: 0.4, alpha: 1)
@@ -170,15 +176,42 @@ enum WebExport {
         for (i, line) in header.enumerated() {
             add(line, .systemFont(ofSize: 10), grey, after: i == header.count - 1 ? 18 : 1)
         }
-        let turns = TranscriptWriter.joinConsecutive(t.segments)
-        if turns.isEmpty {
-            add(tr("transcript.noSpeech", "Geen spraak herkend."),
-                NSFontManager.shared.convert(.systemFont(ofSize: 11), toHaveTrait: .italicFontMask), grey)
+        for summary in summaries {
+            add(ShareDocument.heading(of: summary), .systemFont(ofSize: 15, weight: .bold), after: 8)
+            let blocks = SummaryBlock.parse(summary.markdown)
+            for (i, block) in blocks.enumerated() {
+                let last = i == blocks.count - 1
+                switch block {
+                case .heading(let s): add(ShareDocument.plainInline(s), .systemFont(ofSize: 12, weight: .semibold), after: last ? 18 : 3)
+                case .bullet(let s): add("•\t" + ShareDocument.plainInline(s), .systemFont(ofSize: 11.5), after: last ? 18 : 3, indent: 14)
+                case .paragraph(let s): add(ShareDocument.plainInline(s), .systemFont(ofSize: 11.5), after: last ? 18 : 6)
+                }
+            }
+            if blocks.isEmpty { add("", .systemFont(ofSize: 11.5), after: 12) }
         }
-        for seg in turns {
+        if !summaries.isEmpty && includeTurns {
+            add(tr("window.transcript", "Transcript"), .systemFont(ofSize: 15, weight: .bold), after: 8)
+        }
+        let turns = includeTurns ? TranscriptWriter.joinConsecutive(t.segments) : []
+        let marks = TranscriptWriter.markers(of: t)
+        let placed = marks.placed(in: turns.map(\.start))
+        // A marker: "🚩 12:34 note" in the accent colour under the turn it falls in (as in the app and the .md).
+        let accentText = NSColor(srgbRed: 0xD2 / 255, green: 0x44 / 255, blue: 0x2A / 255, alpha: 1)
+        func addMarker(_ time: Double, after: CGFloat = 4) {
+            add(marks.line(at: time, clock: TranscriptWriter.shortClock), .systemFont(ofSize: 10.5, weight: .semibold), accentText, after: after)
+        }
+        if includeTurns && turns.isEmpty {
+            add(tr("transcript.noSpeech", "Geen spraak herkend."),
+                NSFontManager.shared.convert(.systemFont(ofSize: 11), toHaveTrait: .italicFontMask), grey, after: marks.isEmpty ? 0 : 8)
+            marks.times.forEach { addMarker($0) }
+        }
+        for (i, seg) in turns.enumerated() {
             let time = TranscriptWriter.shortClock(seg.start)
             add(seg.speaker.isEmpty ? time : "\(time) · \(t.name(of: seg.speaker))", .systemFont(ofSize: 10.5, weight: .semibold), grey, after: 2)
-            add(seg.text, .systemFont(ofSize: 11.5), after: 12)
+            let flags = placed[i] ?? []
+            // With markers, they keep close to their turn; the gap to the next turn comes after the last.
+            add(seg.text, .systemFont(ofSize: 11.5), after: flags.isEmpty ? 12 : 4)
+            for (n, flag) in flags.enumerated() { addMarker(flag, after: n == flags.count - 1 ? 12 : 4) }
         }
 
         let page = CGRect(x: 0, y: 0, width: 595, height: 842), margin: CGFloat = 56
@@ -349,6 +382,13 @@ enum WebExport {
             tabs.append(("s\(i)", tabTitle(s.name, count: summaries.count), "<article class=\"summary\">\n" + markdown(s.markdown) + "</article>"))
         }
         let joined = TranscriptWriter.joinConsecutive(t.segments)
+        let marks = TranscriptWriter.markers(of: t)
+        let placed = marks.placed(in: joined.map(\.start))
+        // A marker: the flag and time (click: play from there, as a turn's time) and its note.
+        func marker(_ time: Double) -> String {
+            "<div class=\"marker\"><a class=\"t\" data-t=\"\(time)\">🚩 \(TranscriptWriter.shortClock(time))</a>"
+                + (marks.note(at: time).map { " <span>\(escape($0))</span>" } ?? "") + "</div>\n"
+        }
         var turns = ""
         for (i, seg) in joined.enumerated() {
             let n = (labels.firstIndex(of: seg.speaker) ?? 0) % 6
@@ -357,8 +397,12 @@ enum WebExport {
                 + "<a class=\"t\" data-t=\"\(seg.start)\">\(TranscriptWriter.shortClock(seg.start))</a>"
                 + "<span class=\"who\">\(escape(t.name(of: seg.speaker)))</span>"
                 + "<p>\(escape(seg.text))</p></div>\n"
+            // Under the turn it falls in, as in the app.
+            turns += (placed[i] ?? []).map(marker).joined()
         }
-        if joined.isEmpty { turns = "<p class=\"muted\">\(escape(tr("transcript.noSpeech", "Geen spraak herkend.")))</p>" }
+        if joined.isEmpty {
+            turns = "<p class=\"muted\">\(escape(tr("transcript.noSpeech", "Geen spraak herkend.")))</p>\n" + marks.times.map(marker).joined()
+        }
         tabs.append(("transcript", tr("player.transcript", "Transcript"), "<section class=\"turns\">\n" + turns + "</section>"))
 
         let active = select.flatMap { name in summaries.firstIndex { $0.name == name }.map { "s\($0)" } }
@@ -446,11 +490,12 @@ enum WebExport {
     .turn.now{background:var(--hl)}
     .turn a.t{grid-row:span 2;font-size:13px;padding-top:2px}
     .who{font-weight:600;font-size:14px}
+    .marker{margin:0 10px 8px 74px;font-size:14px}
     .turn p{margin:2px 0 0}
     .c0 .who{color:var(--c0)}.c1 .who{color:var(--c1)}.c2 .who{color:var(--c2)}.c3 .who{color:var(--c3)}.c4 .who{color:var(--c4)}.c5 .who{color:var(--c5)}
     dl.info{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin-top:20px}
     dt{color:var(--muted)}dd{margin:0}
-    @media (max-width:520px){.turn{grid-template-columns:1fr}.turn a.t{grid-row:auto}}
+    @media (max-width:520px){.turn{grid-template-columns:1fr}.turn a.t{grid-row:auto}.marker{margin-left:10px}}
     """
 
     private static let script = """
@@ -487,13 +532,16 @@ enum WebExport {
 /// "Opgenomen met Band·je" with Band·je linked to band.je (owner, 2026-11-07; `WebExport.siteURL`, the
 /// shared page's own link, so no other URL is added).
 enum ShareText {
-    enum Kind { case audio, transcript, webPage }
+    /// `summary`: a document with only summaries; `summaryAndTranscript`: summaries and the transcript.
+    enum Kind { case audio, transcript, summary, summaryAndTranscript, webPage }
 
     static func intro(_ kind: Kind, title: String, date: Date, locale: Locale = TranscriptWriter.appLocale) -> String {
         let day = date.formatted(Date.FormatStyle.dateTime.day().month(.wide).year().locale(locale))
         return switch kind {
         case .audio: tr("share.audio", "Hierbij de opname „%1$@” van %2$@.", title, day)
         case .transcript: tr("share.transcript", "Hierbij het transcript van „%1$@” van %2$@.", title, day)
+        case .summary: tr("share.summary", "Hierbij de samenvatting van „%1$@” van %2$@.", title, day)
+        case .summaryAndTranscript: tr("share.summaryAndTranscript", "Hierbij de samenvatting en het transcript van „%1$@” van %2$@.", title, day)
         case .webPage: tr("share.webPage", "Hierbij de opname „%1$@” van %2$@, met het transcript. Open het bestand in je browser om te luisteren en mee te lezen.", title, day)
         }
     }
@@ -556,6 +604,71 @@ enum ShareText {
         func sharingServicePicker(_ picker: NSSharingServicePicker, didChoose service: NSSharingService?) {
             service?.subject = subject
         }
+    }
+}
+
+/// Share › PDF, Text, Markdown and Print (specs/share.md): one document with the chosen summaries
+/// first (in the order given: newest first, as the window lists them), each under its own heading
+/// "Samenvatting · <template>", then the transcript with its markers. The transcript's title block
+/// (title and header lines) is always at the top; with summaries, "Transcript" heads the turns.
+struct ShareDocument {
+    /// With the folder's markers already in it.
+    var transcript: Transcript
+    var summaries: [WebExport.Summary] = []
+    var includesTranscript = true
+
+    /// "Samenvatting · <template>", as in the chooser.
+    static func heading(of summary: WebExport.Summary) -> String {
+        tr("summary.tab", "Samenvatting") + " · " + summary.name
+    }
+
+    /// A summary's line without its inline Markdown (bold, italic, code).
+    static func plainInline(_ s: String) -> String {
+        guard let a = try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else { return s }
+        return String(a.characters)
+    }
+
+    /// The share sheet's words for it.
+    var kind: ShareText.Kind {
+        summaries.isEmpty ? .transcript : includesTranscript ? .summaryAndTranscript : .summary
+    }
+
+    func markdown(locale: Locale = TranscriptWriter.appLocale) -> String {
+        var out = TranscriptWriter.markdownHead(transcript, locale: locale)
+        for summary in summaries {
+            // The summary's own headings one level down, under its "##".
+            let body = summary.markdown.components(separatedBy: "\n").map { line in
+                line.hasPrefix("#") && !line.hasPrefix("######") ? "#" + line : line
+            }.joined(separator: "\n")
+            out += "## \(Self.heading(of: summary))\n\n" + body.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n"
+        }
+        guard includesTranscript else { return out }
+        if !summaries.isEmpty { out += "## " + tr("window.transcript", "Transcript") + "\n\n" }
+        return out + TranscriptWriter.markdownTurns(transcript, locale: locale)
+    }
+
+    func plainText(locale: Locale = TranscriptWriter.appLocale) -> String {
+        var parts = [TranscriptWriter.plainTextHead(transcript, locale: locale)]
+        for summary in summaries {
+            let body = summary.markdown.components(separatedBy: "\n").map { raw -> String in
+                switch SummaryBlock.parse(raw).first {
+                case .heading(let s): Self.plainInline(s)
+                case .bullet(let s): "• " + Self.plainInline(s)
+                case .paragraph(let s): Self.plainInline(s)
+                case nil: ""
+                }
+            }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            parts.append(Self.heading(of: summary) + "\n\n" + body)
+        }
+        if includesTranscript {
+            if !summaries.isEmpty { parts.append(tr("window.transcript", "Transcript")) }
+            parts += TranscriptWriter.plainTextTurns(transcript, locale: locale)
+        }
+        return parts.joined(separator: "\n\n") + "\n"
+    }
+
+    func pdf(locale: Locale = TranscriptWriter.appLocale, cassette: NSImage? = nil) -> Data {
+        WebExport.pdf(transcript, locale: locale, cassette: cassette, summaries: summaries, turns: includesTranscript)
     }
 }
 

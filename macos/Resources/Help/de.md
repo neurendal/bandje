@@ -8,7 +8,7 @@ Band·je nimmt zwei Dinge gleichzeitig auf: dein Mikrofon und allen Ton, den dei
 
 - Während der Aufnahme wird die Kassette in der Menüleiste rot, ihre Spulen drehen sich und daneben läuft die Zeit in Rot.
 - Dein Mac geht nicht in den Ruhezustand, solange Band·je aufnimmt.
-- Beim ersten Mal fragt macOS, ob der Ton deines Mac aufgenommen werden darf. Erlaube es, sonst hört Band·je nur dein Mikrofon.
+- macOS fragt, ob der Ton deines Mac aufgenommen werden darf, wenn du im Willkommensfenster oder unter Einstellungen › Zugriff auf **Erlauben …** klickst, sonst bei der ersten Aufnahme. Erlaube es, sonst hört Band·je nur dein Mikrofon. Zu Beginn jeder Aufnahme prüft Band·je das still und warnt dich sofort, wenn es aus ist.
 - Bleibt dein Mikrofon sechs Sekunden lang stumm oder wird der Deckel geschlossen, während das eingebaute Mikrofon verwendet wird, warnt Band·je dich und bietet an, zu einem anderen Mikrofon zu wechseln.
 
 Sag den anderen, dass du aufnimmst. In manchen Ländern und bei geschäftlicher Nutzung schreibt das Gesetz es vor, und manchmal brauchst du auch ihre Zustimmung. Du bist selbst dafür verantwortlich, das für dich geltende Recht einzuhalten. Band·je erinnert dich einmal daran, vor deiner ersten Aufnahme.
@@ -50,33 +50,30 @@ Bei einer Telefonleitung mit Sprachmenü oder Warteschleifenmusik hört Band·je
 ## Das Band·je-Fenster {#player}
 Alle deine Aufnahmen in einem Fenster: anhören, mitlesen, suchen, Sprecher benennen, zusammenfassen und teilen.
 
-Wähle im Menü **Band·je öffnen** (⌘O). Das Fenster öffnet sich auch, wenn du Band·je selbst startest, etwa über Launchpad oder Spotlight. **In Band·je öffnen** öffnet die aktuelle Aufnahme. Solange das Fenster offen ist, ist Band·je im Dock und in ⌘Tab; schließt du es, ist Band·je wieder nur in der Menüleiste. Schalte **Immer im Dock** in den [weiteren Einstellungen](#settings) ein, um das Symbol zu behalten. Beim ersten Mal öffnet sich das Fenster immer, mit den Berechtigungen, jede mit eigener Taste. Schließt du das Fenster, bleibt Band·je in der Menüleiste; beende Band·je über dieses Menü.
+Wähle im Menü **Band·je öffnen** (⌘O). Das Fenster öffnet sich auch, wenn du Band·je selbst startest, etwa über Launchpad oder Spotlight. **In Band·je öffnen** öffnet die aktuelle Aufnahme. Solange das Fenster offen ist, ist Band·je im Dock und in ⌘Tab; schließt du es, ist Band·je wieder nur in der Menüleiste. Schalte **Immer im Dock** in den [weiteren Einstellungen](#settings) ein, um das Symbol zu behalten. Beim ersten Mal öffnet sich das Fenster immer mit einer Begrüßung in zwei Schritten: zuerst die Tastenkürzel, dann mit **Weiter** die Berechtigungen, jede mit eigener Taste. Schließt du das Fenster, bleibt Band·je in der Menüleiste; beende Band·je über dieses Menü.
 
 - Links: deine Aufnahmen nach Tag, mit Uhrzeit, Dauer und den ersten Wörtern des Transkripts. Die Suche findet Titel und Wörter in Transkripten. Unten ist **Aufnahme starten**; während der Aufnahme steht die neue Aufnahme oben mit einem roten Punkt, und nach dem Stoppen öffnet das Fenster sie.
 - Rechts: die Aufnahme mit der Kassette, der Positionsleiste und der Wiedergabetaste (Leertaste). Klicke auf einen Satz, um ab dort zuzuhören; während der Wiedergabe wird der Satz hervorgehoben, den du gerade hörst, und das Transkript läuft mit. **Im Transkript suchen** (⌘F) findet Wörter.
 - Neben **Transkript** ist der Tab **Zusammenfassung**. Gibt es noch keine Zusammenfassung, steht dort **Zusammenfassen**: Wähle eine Vorlage, siehe [Zusammenfassungen](#summaries). Jede Zusammenfassung bekommt einen eigenen Tab; **Weitere Zusammenfassung** erstellt eine weitere.
 - Noch kein Transkript (etwa bei einer Aufnahme von deinem iPhone)? Klicke auf **Transkribieren**.
-- **Teilen**: **Audio …**, **Transkript (.md) …**, **Transkript als PDF …** oder **Webseite mit Audio …**: eine Datei mit Player, Transkript, Zusammenfassungen und Ton, die in jedem Browser funktioniert, auch offline. **Webseite mit Audio, kompakt (für E-Mail) …** macht den Ton kleiner. Die Seite hat einen Link zu band.je und sonst nichts.
-- Auf Papier: **Drucken …** (⌘P oder unter **Teilen**) druckt das Transkript, genau wie das PDF.
+- **Teilen**: **Audio …** und **Audioseite …** teilen die Aufnahme. **Teilen als …**, **Kopieren als …** und **Sichern als …** fragen zuerst **PDF**, **Text** oder **Markdown** und sind ein Dokument: zuerst die Zusammenfassungen, dann das Transkript. Gibt es Zusammenfassungen, hakst du dort auch an, was hineinkommt (alles ist angehakt). **Sichern als …** sichert es, wo du willst, **Kopieren als …** legt es in die Zwischenablage. **Audioseite …** ist eine Datei mit Player, Transkript, Zusammenfassungen und Ton, die in jedem Browser funktioniert, auch offline. **Audioseite, kompakt (für E-Mail) …** macht den Ton kleiner. Die Seite hat einen Link zu band.je und sonst nichts.
+- Auf Papier: **Drucken …** (⌘P oder unter **Teilen**) druckt dasselbe Dokument wie das PDF.
+- Kopieren: **Kopieren** neben einer Zusammenfassung legt ihren Text in die Zwischenablage. Du kannst auch Text auswählen und ⌘C drücken.
 - **Mehr**: **Name und Farbe …** (oder klicke auf den Titel auf der Kassette): Name und Farbe der Kassette, **Sprecher benennen …**, **Im Finder zeigen**, **Löschen …** (in den Papierkorb).
 - Eine Aufnahme kannst du auch in der Liste löschen: klicke sie mit der rechten Maustaste an und wähle **Löschen …**, oder wähle sie aus und drücke ⌫. Band·je fragt vorher nach.
 
 ## Diktat {#dictation}
-Drücke ⌃⌥⌘D, sprich, und der Text erscheint dort, wo dein Cursor steht: in einem Chat, einer E-Mail, einem Editor oder im Terminal.
+Drücke ⌃⌥⌘D, sprich, und dein Text liegt in der Zwischenablage. Füge ihn mit ⌘V dort ein, wo dein Cursor steht: in einem Chat, einer E-Mail, einem Editor oder im Terminal.
 
 Du kannst den Kurzbefehl auf zwei Arten nutzen:
 
 - **Tippen** auf ⌃⌥⌘D: Band·je hört zu, bis du Return oder noch einmal ⌃⌥⌘D drückst. Das Return selbst geht nicht an die App.
-- **Halten** von ⌃⌥⌘D: Band·je hört zu, solange du die Tasten hältst, und fügt ein, wenn du loslässt.
+- **Halten** von ⌃⌥⌘D: Band·je hört zu, solange du die Tasten hältst, und legt den Text in die Zwischenablage, wenn du loslässt.
 
 Mit Esc brichst du ab. Das Symbol in der Menüleiste wird orange, solange Band·je zuhört, mit der Zeit daneben. Ein Diktat kann bis zu fünf Minuten dauern; in den letzten 30 Sekunden blinkt die Zeit.
 
 ### Einfügen
-Der Text liegt immer in der Zwischenablage. Damit Band·je ihn für dich einfügen kann, braucht es die Erlaubnis, einen Tastendruck (⌘V) zu senden: Wähle im Menü **Automatisch einfügen …** oder geh zu Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen und aktiviere Band·je. Ohne diese Erlaubnis fügst du selbst mit ⌘V ein.
-
-macOS teilt einem laufenden Band·je diese Erlaubnis erst nach einem Neustart mit. Gerade aktiviert? Wähle im Menü **Band·je neu starten für automatisches Einfügen** oder **Band·je neu starten** in den [weiteren Einstellungen](#settings).
-
-Hörst du statt des Einfügens einen kurzen Ton, hat ein Passwortfeld oder eine andere App die sichere Eingabe eingeschaltet (die sichere Tastatureingabe im Terminal, ein Passwortmanager). macOS blockiert dann das Einfügen; der Text liegt in der Zwischenablage, drücke also selbst ⌘V.
+Nach dem Diktieren liegt der Text in der Zwischenablage, und neben der Kassette steht kurz ⌘V. Drücke ⌘V, um ihn dort einzufügen, wo dein Cursor steht. Der Text bleibt in der Zwischenablage, bis du etwas anderes kopierst, du kannst ihn also auch später oder an mehreren Stellen einfügen.
 
 Nichts, was du diktierst, wird gespeichert.
 
@@ -170,7 +167,25 @@ Klicke auf **Ändern …** und wähle einen Ordner, irgendwo auf deinem Mac oder
 Liegt der Ordner in iCloud Drive, Dropbox oder einem anderen Clouddienst (auch Schreibtisch und Dokumente, wenn sie in iCloud liegen), warnt Band·je dich: Deine Aufnahmen verlassen deinen Mac dann über diesen Dienst.
 
 ### Zugriff
-Ob Band·je das Mikrofon nutzen, für dich einfügen und den Ton deines Mac aufnehmen darf, mit je einer Taste (**Erlauben …** oder **Einstellungen öffnen …**). Ein grünes Häkchen heißt erlaubt; der Stand aktualisiert sich von selbst, wenn du aus den Systemeinstellungen zurückkommst. Siehe [Problemlösung](#troubleshooting).
+Ob Band·je das Mikrofon nutzen und den Ton deines Mac aufnehmen darf, mit je einer Taste (**Erlauben …** oder **Einstellungen öffnen …**). Ein grünes Häkchen heißt erlaubt; der Stand aktualisiert sich von selbst, wenn du aus den Systemeinstellungen zurückkommst. Siehe [Problemlösung](#troubleshooting).
+
+## Band·je Unbegrenzt {#purchases}
+Was kostenlos ist, was die zwei Käufe freischalten und wie du sie wiederherstellst (Band·je aus dem App Store).
+
+Band·je ist kostenlos. Aufnehmen ist immer kostenlos und nie begrenzt.
+
+- **Transkribieren** ist für deine ersten 5 Aufnahmen kostenlos. Eine Aufnahme zählt einmal, wenn ihre erste Transkription fertig ist; sie erneut zu transkribieren ist kostenlos.
+- **Diktieren** ist für insgesamt 15 Minuten diktiertes Audio kostenlos. Ein Diktat, das läuft, wenn die Minuten aufgebraucht sind, endet ganz normal. Nach 10 Minuten sagt Band·je einmal, wie viele kostenlose Minuten noch übrig sind; das Menü in der Menüleiste zeigt es auch.
+- Was du schon hast, bleibt deins: Transkripte, Zusammenfassungen, Teilen und Exportieren werden nie gesperrt. Zusammenfassungen sind bei jedem Transkript kostenlos.
+
+Zwei Käufe, jeweils einmal bezahlt, kein Abo:
+
+- **Band·je Unbegrenzt**: Transkribieren und Diktieren ohne Limit.
+- **Band·je Diktieren**: Diktieren ohne Limit.
+
+Kaufe sie unter **Einstellungen … › Käufe** oder wähle **Band·je Unbegrenzt kaufen …** im Menü Band·je, solange das Fenster offen ist. Sind die kostenlosen Transkriptionen verbraucht, zeigt **Transkribieren** zuerst Band·je Unbegrenzt; eine automatische Transkription startet dann nicht, und die Aufnahme sagt das.
+
+Hast du Band·je gekauft, bevor es kostenlos wurde, ist alles freigeschaltet, ohne dass du etwas tun musst. Ein Kauf gilt auf jedem Mac, iPhone und iPad mit demselben Apple Account und mit der Familienfreigabe. Wähle auf einem anderen Mac **Käufe wiederherstellen**. Der kostenlose Teil zählt pro Gerät. Das Willkommensfenster sagt, was kostenlos ist, mit **Schon gekauft? Käufe wiederherstellen**.
 
 ## Datenschutz und Netzwerk {#privacy}
 Deine Aufnahmen, Transkripte und Zusammenfassungen verlassen deinen Mac nie.
@@ -199,15 +214,14 @@ Lösungen für Dinge, die schiefgehen können.
 Viele Probleme kommen von einer fehlenden Berechtigung. Wähle **Einstellungen …** und sieh unter **Zugriff** nach:
 
 - **Mikrofon**: nötig, um deine Stimme aufzunehmen und zu diktieren.
-- **Ton von deinem Mac**: nötig, um die Gegenseite aufzunehmen. macOS lässt Apps diese Berechtigung nicht auslesen, deshalb zeigt Band·je, was bei der letzten Aufnahme passiert ist: Ton kam an, oder es war still. Still ist normal, wenn nichts abgespielt wurde.
-- **Automatisches Einfügen**: nötig, um diktierten Text für dich einzufügen.
+- **Ton von deinem Mac**: nötig, um die Gegenseite aufzunehmen. macOS lässt Apps diese Berechtigung nicht auslesen, deshalb prüft Band·je es selbst: Es spielt eine halbe Sekunde lang ein unhörbares Signal ab, das nie deine Lautsprecher oder AirPods erreicht, und schaut, ob es ankommt. **Erlauben …** lässt macOS fragen; nach **Einstellungen öffnen …** erscheint das Häkchen, sobald du Band·je eingeschaltet hast.
 
 Ein grünes Häkchen heißt erlaubt. Sonst: Klicke auf **Einstellungen öffnen …**, schalte Band·je ein und komm zurück; Band·je merkt es von selbst.
 
-Bei jedem Start prüft Band·je das Mikrofon und das automatische Einfügen und sagt dir, wenn etwas fehlt. Brauchst du das automatische Einfügen nicht? Markiere **Diese Meldung nicht mehr anzeigen** oder schalte unter Zugriff **Beim Start warnen, wenn etwas fehlt** aus.
+Bei jedem Start prüft Band·je das Mikrofon, und den Ton deines Mac, falls der aus war, und sagt dir, wenn etwas fehlt. Willst du die Meldung nicht? Markiere **Diese Meldung nicht mehr anzeigen** oder schalte unter Zugriff **Beim Start warnen, wenn etwas fehlt** aus.
 
 ### Die Gegenseite fehlt in der Aufnahme
-macOS hat Band·je nicht erlaubt, den Ton deines Mac aufzunehmen. Geh zu Systemeinstellungen > Datenschutz & Sicherheit > Aufnahme von Bildschirm & Systemaudio und aktiviere Band·je unter „Nur Aufnahme von Systemaudio“.
+macOS hat Band·je nicht erlaubt, den Ton deines Mac aufzunehmen. Band·je warnt dich davor zu Beginn einer Aufnahme. Geh zu Systemeinstellungen > Datenschutz & Sicherheit > Aufnahme von Bildschirm & Systemaudio und aktiviere Band·je unter „Nur Aufnahme von Systemaudio“. Klappt es danach noch nicht sofort? Starte Band·je neu.
 
 ### Meine eigene Stimme fehlt
 Sieh im Menü **Mikrofon** nach. Bei geschlossenem Deckel ist das eingebaute Mikrofon aus: Wähle ein anderes. Darf Band·je das Mikrofon gar nicht verwenden, aktiviere es unter Systemeinstellungen > Datenschutz & Sicherheit > Mikrofon.

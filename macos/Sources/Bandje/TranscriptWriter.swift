@@ -1,3 +1,4 @@
+import BandjeKit
 import Foundation
 
 /// A recognised word with its time in seconds from the start of the recording.
@@ -47,12 +48,12 @@ struct Transcript {
         return name.isEmpty ? label : name
     }
 
-    /// Original labels in order of first appearance.
     /// Speakers without a name yet (the menu's "Benoem sprekers… (1 zonder naam)").
     var unnamedSpeakers: Int {
         speakerLabels.filter { !$0.isEmpty && (speakerNames[$0]?.isEmpty ?? true) }.count
     }
 
+    /// Original labels in order of first appearance.
     var speakerLabels: [String] {
         var seen: [String] = []
         for seg in segments where !seen.contains(seg.speaker) { seen.append(seg.speaker) }
@@ -249,11 +250,6 @@ enum TranscriptWriter {
 
     // MARK: Output
 
-    static func timestamp(_ t: Double) -> String {
-        let s = max(0, Int(t))
-        return String(format: "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60)
-    }
-
     /// `2026-11-04_14-30` (optionally `_2`) becomes `2026-11-04 14:30`; anything else stays as is.
     static func title(forBaseName name: String) -> String {
         guard isRecordingName(name) else { return name }
@@ -261,11 +257,25 @@ enum TranscriptWriter {
         return "\(parts[0]) \(parts[1].replacingOccurrences(of: "-", with: ":"))"
     }
 
-    /// Whether a base name looks like one of Bandje's own recordings (`YYYY-MM-DD_HH-mm`, optionally `_2`).
+    /// Whether a base name is one of Bandje's own (old) recording names: a real date and time
+    /// `yyyy-MM-dd_HH-mm`, optionally followed by `_2`, `_3`….
     static func isRecordingName(_ name: String) -> Bool {
-        let parts = name.split(separator: "_")
-        return parts.count >= 2 && parts.count <= 3 && parts[0].count == 10 && parts[1].count == 5 && parts[1].contains("-")
+        let parts = name.split(separator: "_", omittingEmptySubsequences: false)
+        guard parts.count == 2 || parts.count == 3, parts[0].count == 10, parts[1].count == 5 else { return false }
+        if parts.count == 3 {
+            guard parts[2].allSatisfy({ $0.isASCII && $0.isNumber }), let n = Int(parts[2]), n >= 2 else { return false }
+        }
+        return recordingNameFormat.date(from: "\(parts[0])_\(parts[1])") != nil
     }
+
+    private static let recordingNameFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")  // every time exists (no daylight saving gap)
+        f.dateFormat = "yyyy-MM-dd_HH-mm"
+        f.isLenient = false
+        return f
+    }()
 
     /// The app's language with this Mac's region, for the names of new recordings: the iPhone uses
     /// `Locale.current`, so English in the Netherlands is "Recording 6 Nov 14.32" on both.
@@ -334,16 +344,94 @@ enum TranscriptWriter {
     /// with the text on the next line (a Markdown hard break: two spaces before the newline).
     /// An old Mac title (`2026-11-04 14:30`) becomes "Opname woensdag 4 november 2026 om 14:30".
     static func markdown(_ t: Transcript, locale: Locale = appLocale) -> String {
+        markdownHead(t, locale: locale) + markdownTurns(t, locale: locale)
+    }
+
+    /// The title block of `markdown`: the heading, the header lines and the rule.
+    static func markdownHead(_ t: Transcript, locale: Locale = appLocale) -> String {
+        "# \(heading(t, locale: locale))\n\n" + headerLines(t, locale: locale).joined(separator: "  \n") + "\n\n---\n\n"
+    }
+
+    /// The title of the transcript's documents: an old Mac title becomes "Opname <date>".
+    static func heading(_ t: Transcript, locale: Locale = appLocale) -> String {
         let display = displayTitle(t.title, locale: locale)
-        let heading = display == t.title ? t.title : tr("transcript.title", "Opname %@", display)
-        var out = "# \(heading)\n\n" + headerLines(t, locale: locale).joined(separator: "  \n") + "\n\n---\n\n"
+        return display == t.title ? t.title : tr("transcript.title", "Opname %@", display)
+    }
+
+    /// The turns of `markdown`, after its title block.
+    static func markdownTurns(_ t: Transcript, locale: Locale = appLocale) -> String {
+        var out = ""
         let joined = joinConsecutive(t.segments)
-        if joined.isEmpty { out += "_" + tr("transcript.noSpeech", "Geen spraak herkend.") + "_\n" }
-        for seg in joined {
+        let marks = markers(of: t)
+        let placed = marks.placed(in: joined.map(\.start))
+        if joined.isEmpty {
+            out += "_" + tr("transcript.noSpeech", "Geen spraak herkend.") + "_\n"
+            // No turns to put them under: the markers after the line.
+            for time in marks.times { out += "\n" + marks.line(at: time, clock: shortClock) + "\n" }
+        }
+        for (i, seg) in joined.enumerated() {
             // Without speakers (Sprekers herkennen off): only the time.
             let label = seg.speaker.isEmpty ? shortClock(seg.start) : "\(shortClock(seg.start)) · \(t.name(of: seg.speaker))"
             out += "**\(label)**  \n\(seg.text)\n\n"
+            // A marker: "🚩 12:34 note" as its own paragraph under the turn it falls in, as in the app.
+            for time in placed[i] ?? [] { out += marks.line(at: time, clock: shortClock) + "\n\n" }
         }
+        return out
+    }
+
+    /// The transcript as plain text for the clipboard, as the iPhone's: the title and header lines,
+    /// then per turn "0:01 · Spreker 1" with the text on the next line and its markers under it.
+    static func plainText(_ t: Transcript, locale: Locale = appLocale) -> String {
+        ([plainTextHead(t, locale: locale)] + plainTextTurns(t, locale: locale)).joined(separator: "\n\n") + "\n"
+    }
+
+    /// The title block of `plainText`: the title and the header lines.
+    static func plainTextHead(_ t: Transcript, locale: Locale = appLocale) -> String {
+        heading(t, locale: locale) + "\n" + headerLines(t, locale: locale).joined(separator: "\n")
+    }
+
+    /// The turns of `plainText`, one paragraph each (an empty line between them).
+    static func plainTextTurns(_ t: Transcript, locale: Locale = appLocale) -> [String] {
+        let joined = joinConsecutive(t.segments)
+        let marks = markers(of: t)
+        let placed = marks.placed(in: joined.map(\.start))
+        var parts: [String] = []
+        if joined.isEmpty {
+            parts.append(tr("transcript.noSpeech", "Geen spraak herkend.")
+                         + marks.times.map { "\n" + marks.line(at: $0, clock: shortClock) }.joined())
+        }
+        for (i, seg) in joined.enumerated() {
+            let time = shortClock(seg.start)
+            parts.append((seg.speaker.isEmpty ? time : "\(time) · \(t.name(of: seg.speaker))") + "\n" + seg.text
+                         + (placed[i] ?? []).map { "\n" + marks.line(at: $0, clock: shortClock) }.joined())
+        }
+        return parts
+    }
+
+    // MARK: Markers (specs/markers.md)
+
+    /// The markers kept in the transcript: `markers` (times, as the iPhone writes them) and
+    /// `markerNotes` (by `Markers.key`).
+    static func markers(of t: Transcript) -> Markers {
+        let times = (t.extra["markers"] as? [Any])?.compactMap { ($0 as? NSNumber)?.doubleValue } ?? []
+        return Markers(times: times, notes: t.extra["markerNotes"] as? [String: String] ?? [:])
+    }
+
+    /// Puts `markers` into the transcript (a copy: the folder's `.bandje.json` and `.markers.json`
+    /// stay the source); no markers or notes, no key.
+    static func apply(_ markers: Markers, to t: inout Transcript) {
+        t.extra["markers"] = markers.isEmpty ? nil : markers.times
+        t.extra["markerNotes"] = markers.notes.isEmpty ? nil : markers.notes
+    }
+
+    /// The transcript at `json` with the markers its folder has now (for exports: always current,
+    /// also when another device changed them since the transcript was written). A folder without
+    /// `.bandje.json` (a file transcribed elsewhere) has no markers of its own: the transcript's stay.
+    static func withFolderMarkers(_ t: Transcript, json: URL) -> Transcript {
+        let folder = json.deletingLastPathComponent()
+        guard FileManager.default.fileExists(atPath: folder.appendingPathComponent(Markers.metaFileName).path) else { return t }
+        var out = t
+        apply(Markers.read(from: folder), to: &out)
         return out
     }
 

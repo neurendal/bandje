@@ -20,6 +20,7 @@ Website: [band.je](https://band.je). Source: [github.com/neurendal/bandje](https
 - Apple silicon Mac, macOS 15 or later (summaries need macOS 26 with Apple Intelligence on)
 - Xcode command line tools (Swift 6)
 - About 400 MB for the speech models
+- `bandje-core` (the shared package BandjeKit) next to this folder: `../bandje-core`
 
 ## Build
 

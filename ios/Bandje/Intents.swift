@@ -24,7 +24,6 @@ enum RecordingCommands {
         guard consentShown else {
             throw RecorderError(message: String(localized: "Open Bandje to make your first recording."))
         }
-        Player.shared.unload()
         #if DEBUG
         try await recorder.start(source: Selftest.uiFakeMic())
         #else
@@ -32,14 +31,20 @@ enum RecordingCommands {
         #endif
     }
 
-    /// Stops and saves the recording, then transcribes it if that setting is on.
-    static func stop() async {
+    /// Stops and saves the recording, then transcribes it if that setting is on. Returns its folder.
+    @discardableResult
+    static func stop() async -> URL? {
         let recorder = Recorder.shared
-        guard recorder.isActive, let folder = await recorder.stop() else { return }
+        guard recorder.isActive else { return nil }
+        await CloudSync.shared.resolveFolder()  // launched in the background for this: not set yet
+        guard let folder = await recorder.stop() else { return nil }
         let library = Library.shared
         await library.refresh()
         library.justRecorded = folder
-        Transcriptions.shared.startIfAutomatic(library.recordings.filter { $0.folder == folder })
+        // Stopped from the Lock Screen or Siri with Bandje in the background: transcribing waits
+        // until it is in front, as for Watch recordings (iOS would stop it in the background).
+        library.transcribeAutomatically(library.recordings.filter { $0.folder == folder })
+        return folder
     }
 
     static func togglePause() {

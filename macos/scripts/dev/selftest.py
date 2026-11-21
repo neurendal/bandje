@@ -31,7 +31,7 @@ def report(name, ok, detail=""):
 
 
 def skip(name, reason):
-    """Not testable in the current hardware state; goes to OCHTEND.md, not a failure."""
+    """Not testable in the current hardware state; reported for a manual check, not a failure."""
     skipped.append((name, reason))
     print("SKIP " + name + ": " + reason, flush=True)
 
@@ -468,7 +468,8 @@ def test_kill():
     time.sleep(1.0)
     t_play = play("nl_xander.wav")  # 1 s .. ~5 s; the kill comes during or just after it
     proc.wait()
-    alive = run(["pgrep", "-f", "Bandje.app/Contents/MacOS/Bandje"]).stdout.strip()
+    # Only this build's app: an installed Band·je (/Applications, ~/Applications) may be running.
+    alive = run(["pgrep", "-f", os.path.realpath(APP) + "/Contents/MacOS/Bandje"]).stdout.strip()
     report("kill: process is gone", alive == "", alive)
     f, dur = afinfo(caf)
     report("kill: .caf left behind and readable", os.path.exists(caf) and dur is not None and "2 ch" in f,
@@ -1224,6 +1225,70 @@ def test_languages():
                "%.1f%%: %s" % (w * 100, last.get("text", "") or json.dumps(last.get("errors"))))
 
 
+def test_purchases():
+    """Freemium (specs/purchase.md) in a DEBUG build with -purchaseState: past the free limit Transcribe
+    in the window doesn't start and shows the paywall, and so does dictation (stopped before the
+    microphone); unlocked, the transcription starts. Without -purchaseState (a build from source)
+    there is no store and nothing is limited. Never records or listens."""
+    folder = os.path.join(SELFTEST_DIR, "purchase-gate")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    audio = os.path.join(folder, "purchase-gate.wav")
+    shutil.copyfile(os.path.join(FIX, "nl_ellen.wav"), audio)
+
+    def gate(state, *more):
+        if os.path.exists(os.path.join(SELFTEST_DIR, "last.json")):
+            os.remove(os.path.join(SELFTEST_DIR, "last.json"))
+        extra = (["-purchaseState", state] if state else []) + list(more)
+        run(["open", "-W", "-n", APP, "--args", *LANG_ARGS, *extra, "--selftest-gate", audio])
+        return read_json("last.json") or {}
+
+    used = gate("used")
+    report("purchases used: Transcribe doesn't start, the paywall shows",
+           used.get("transcriptionStarted") is False and used.get("transcribePaywall") is True, json.dumps(used))
+    report("purchases used: dictation doesn't start, the paywall shows",
+           used.get("mayDictate") is False and used.get("dictationStarted") is False and used.get("dictationPaywall") is True,
+           json.dumps(used))
+    free = gate("free")
+    report("purchases free: transcribing allowed (all %s free ones left), no paywall" % free.get("freeTranscriptions"),
+           free.get("mayTranscribe") is True and isinstance(free.get("freeTranscriptions"), int)
+           and free.get("transcriptionsLeft") == free.get("freeTranscriptions") and free.get("transcriptionStarted") is True and free.get("transcribePaywall") is False
+           and free.get("mayDictate") is True, json.dumps(free))
+    report("purchases free: no dictation note at 20 s, no menu line",
+           free.get("dictationWarning") is False and free.get("fewDictationMinutesAfter") == -1, json.dumps(free))
+    near = gate("free", "-freeDictationUsed", "590")
+    report("purchases free at 9:50: a dictation past 10 minutes brings the note once, the menu line says 5",
+           near.get("fewDictationMinutesBefore") == -1 and near.get("dictationWarning") is True
+           and near.get("dictationWarningAgain") is False and near.get("fewDictationMinutesAfter") == 5, json.dumps(near))
+    unlimited = gate("unlimited")
+    report("purchases unlimited: the transcription starts, no paywall",
+           unlimited.get("transcriptionStarted") is True and unlimited.get("transcribePaywall") is False
+           and unlimited.get("mayDictate") is True, json.dumps(unlimited))
+    dictation = gate("dictation")
+    report("purchases dictation only: dictation allowed",
+           dictation.get("mayDictate") is True, json.dumps(dictation))
+    none = gate(None)
+    report("purchases: a build from source has no store, nothing limited",
+           none.get("storeActive") is False and none.get("transcriptionStarted") is True and none.get("transcribePaywall") is False,
+           json.dumps(none))
+    for state, want in (("free", "free"), ("dictation", "dictationOwned"), ("existing", "unlocked"), (None, "none")):
+        if os.path.exists(os.path.join(SELFTEST_DIR, "last.json")):
+            os.remove(os.path.join(SELFTEST_DIR, "last.json"))
+        run(["open", "-W", "-n", APP, "--args", *LANG_ARGS, *(["-purchaseState", state] if state else []),
+             "--selftest-snapshot", "welcome"])
+        welcome = read_json("last.json") or {}
+        report("purchases %s: the welcome's Free to Start section says %s" % (state or "source build", want),
+               welcome.get("welcomeFree") == want, json.dumps(welcome))
+    # The welcome's second step (Permissions) opens with --welcome-step 2.
+    if os.path.exists(os.path.join(SELFTEST_DIR, "last.json")):
+        os.remove(os.path.join(SELFTEST_DIR, "last.json"))
+    run(["open", "-W", "-n", APP, "--args", *LANG_ARGS, "--selftest-snapshot", "welcome", "--welcome-step", "2"])
+    welcome = read_json("last.json") or {}
+    report("welcome: --welcome-step 2 shows the Permissions step", welcome.get("welcomeStep") == 2, json.dumps(welcome))
+    report("purchases: nothing written next to the audio", sorted(os.listdir(folder)) == ["purchase-gate.wav"], str(os.listdir(folder)))
+    shutil.rmtree(folder, ignore_errors=True)
+
+
 def test_leaks():
     """No Bandje aggregate device or tap left behind after the app quit."""
     r = run(["swift", os.path.join(ROOT, "scripts", "dev", "list-devices.swift"), "--leaks"])
@@ -1234,16 +1299,26 @@ def test_leaks():
 def main():
     tests = sys.argv[1:] or ["static", "record", "lr", "outputdir", "rebuild", "kill", "diskfull",
                              "nomodels", "transcribe", "crosstalk", "english",
-                             "group", "room", "onevoice", "memo", "nowho", "concurrent", "dictate", "languages", "summary", "help", "menu", "micswitch", "leaks"]
+                             "group", "room", "onevoice", "memo", "nowho", "concurrent", "dictate", "languages", "summary", "help", "menu", "purchases", "micswitch", "leaks"]
     for t in tests:
         {"static": test_static, "record": test_record, "lr": test_lr, "long": test_long,
          "outputdir": test_outputdir, "rebuild": test_rebuild, "kill": test_kill,
          "diskfull": test_diskfull, "nomodels": test_nomodels, "transcribe": test_transcribe,
          "crosstalk": test_crosstalk, "english": test_english, "group": test_group, "room": test_room,
          "onevoice": test_onevoice, "memo": test_memo, "nowho": test_nowho,
-         "concurrent": test_concurrent, "dictate": test_dictate, "languages": test_languages, "summary": test_summary, "help": test_help, "menu": test_menu, "micswitch": test_micswitch, "leaks": test_leaks}[t]()
+         "concurrent": test_concurrent, "dictate": test_dictate, "languages": test_languages, "summary": test_summary, "help": test_help, "menu": test_menu, "purchases": test_purchases, "micswitch": test_micswitch, "leaks": test_leaks}[t]()
     failed = [r for r in results if not r[1]]
-    print("\n%d checks, %d failed, %d skipped" % (len(results), len(failed), len(skipped)))
+    # Repeat what failed at the end and keep the whole run: a flaky check stays findable when only
+    # the last lines were read.
+    for name, _, detail in failed:
+        print("FAILED " + name + (": " + detail if detail else ""))
+    os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+    with open(os.path.join(ROOT, "build", "selftest-last.txt"), "w") as f:
+        for name, ok, detail in results:
+            f.write(("PASS " if ok else "FAIL ") + name + (": " + detail if detail else "") + "\n")
+        for name, reason in skipped:
+            f.write("SKIP " + name + ": " + reason + "\n")
+    print("\n%d checks, %d failed, %d skipped (all results: build/selftest-last.txt)" % (len(results), len(failed), len(skipped)))
     sys.exit(1 if failed else 0)
 
 

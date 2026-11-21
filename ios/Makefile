@@ -1,6 +1,9 @@
 # Bandje for iOS. Fixed test simulator: iPhone 17 Pro, iOS 26.5.
-# The first "iPhone 17 Pro" simulator (ids change when simulators are recreated).
-SIM ?= $(shell xcrun simctl list devices available | grep -m1 "iPhone 17 Pro .[0-9A-F]" | grep -oE "[0-9A-F-]{36}")
+# The first "iPhone 17 Pro" simulator (ids change when simulators are recreated), else the first
+# iPhone simulator. `make build` also works without any simulator (generic destination); test, run
+# and screenshots need one.
+SIM ?= $(shell xcrun simctl list devices available | grep -m1 "iPhone 17 Pro .[0-9A-F]" | grep -oE "[0-9A-F-]{36}" || xcrun simctl list devices available | grep -m1 "iPhone .*[0-9A-F]\{8\}-" | grep -oE "[0-9A-F-]{36}")
+BUILD_DEST = $(if $(SIM),id=$(SIM),generic/platform=iOS Simulator)
 PROJECT = Bandje.xcodeproj
 SCHEME = Bandje
 DERIVED = build/DerivedData
@@ -17,7 +20,7 @@ resolve: gen
 	$(XCB) -resolvePackageDependencies
 
 build: gen
-	$(XCB) -destination id=$(SIM) -configuration Debug build
+	$(XCB) -destination '$(BUILD_DEST)' -configuration Debug build
 
 fixtures:
 	bash scripts/dev/make-fixtures.sh >/dev/null

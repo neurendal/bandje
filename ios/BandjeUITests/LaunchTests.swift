@@ -105,9 +105,23 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(sentence.waitForExistence(timeout: 120))
         XCTAssertFalse(app.descendants(matching: .any)["detailTabs"].exists)
         XCTAssertFalse(app.buttons["Summary"].exists)
+        // Long press on a turn: its copy menu (specs/share.md); scrolling and tapping still work after.
+        sentence.press(forDuration: 1.2)
+        XCTAssertTrue(app.buttons["Copy"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Copy All"].exists)
+        app.buttons["Copy All"].tap()
+        XCTAssertFalse(app.buttons["Copy"].waitForExistence(timeout: 1))
+        app.swipeUp()
+        app.swipeDown()
+        XCTAssertFalse(app.buttons["Copy"].exists)
+        XCTAssertTrue(sentence.waitForExistence(timeout: 3))
+        // Without a summary: the short menu, no chooser.
         app.buttons["shareMenu"].tap()
-        XCTAssertTrue(app.buttons["Transcript as text"].waitForExistence(timeout: 3))
+        for id in ["shareAudio", "sharePDF", "shareText", "shareMarkdown", "shareWebPage", "sharePrint"] {
+            XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 3), id)
+        }
         XCTAssertFalse(app.buttons["Summary"].exists)
+        XCTAssertFalse(app.buttons["Copy transcript"].exists)
     }
 
     /// With Apple Intelligence: the Summary tab makes a summary with the template's headings,
@@ -136,8 +150,36 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(summarize.exists)
         app.buttons["Transcript"].tap()
         XCTAssertTrue(sentence.waitForExistence(timeout: 5))
+        // Long press on a part of the summary: copy it or the whole summary.
+        app.buttons["Summary"].tap()
+        let decisions = app.staticTexts["Decisions"]
+        XCTAssertTrue(decisions.waitForExistence(timeout: 5))
+        decisions.press(forDuration: 1.2)
+        XCTAssertTrue(app.buttons["Copy All"].waitForExistence(timeout: 3))
+        app.buttons["Copy"].tap()
+        XCTAssertFalse(app.buttons["Copy All"].waitForExistence(timeout: 1))
+        // Scrolling over the summary still scrolls (no menu, no selection).
+        app.descendants(matching: .any)["summaryBody"].swipeUp()
+        app.descendants(matching: .any)["summaryBody"].swipeDown()
+        XCTAssertFalse(app.buttons["Copy All"].exists)
+        XCTAssertTrue(decisions.waitForExistence(timeout: 3))
+        app.buttons["Transcript"].tap()
+        XCTAssertTrue(sentence.waitForExistence(timeout: 5))
+        // With a summary: the chooser first, all checked; nothing checked disables the button.
         app.buttons["shareMenu"].tap()
-        XCTAssertTrue(app.buttons["Summary"].waitForExistence(timeout: 3))
+        let text = app.buttons["shareText"]
+        XCTAssertTrue(text.waitForExistence(timeout: 3))
+        text.tap()
+        let share = app.buttons["shareChooserButton"]
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        XCTAssertTrue(share.isEnabled)
+        app.buttons["Meeting"].firstMatch.tap()  // a summary is listed by its template's name
+        app.buttons["chooserTranscript"].tap()
+        XCTAssertFalse(share.isEnabled)
+        app.buttons["chooserTranscript"].tap()
+        XCTAssertTrue(share.isEnabled)
+        app.buttons["chooserClose"].tap()
+        XCTAssertFalse(share.waitForExistence(timeout: 1))
     }
 
     /// Record with the fake mic through the UI: time runs, stop, the recording is in the list.
@@ -203,6 +245,52 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5))
     }
 
+    /// Record a short piece, stop (the recording opens by itself), transcribe right away: the
+    /// transcript must stay, not turn into a lasting spinner (bug seen on 1.0.0, 2026-11-08).
+    @MainActor
+    func testTranscribeRightAfterRecording() throws {
+        let mic = Self.fixtures.appending(path: "mic_60s.wav")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: mic.path), "run scripts/dev/make-fixtures.sh")
+        let app = XCUIApplication()
+        app.launchArguments = ["--reset", "--fake-mic", mic.path, "-AppleLanguages", "(en)"]
+        app.launch()
+        app.buttons["recordButton"].tap()
+        let consent = app.alerts.buttons["Understood, record"].firstMatch
+        if consent.waitForExistence(timeout: 5) { consent.tap() }
+        XCTAssertTrue(app.staticTexts["elapsed"].waitForExistence(timeout: 5))
+        sleep(6)
+        app.buttons["stopButton"].tap()
+        let transcribe = app.buttons["transcribeButton"]
+        XCTAssertTrue(transcribe.waitForExistence(timeout: 15))
+        transcribe.tap()
+        // A transcript (sentences are links) or the empty-transcript line.
+        let result = app.descendants(matching: .any).matching(
+            NSPredicate(format: "elementType == %d OR label == 'No speech recognised.'", XCUIElement.ElementType.link.rawValue)).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 120), "no transcript appeared")
+        // Give whatever follows the transcription (library refresh, cover art) time to land.
+        sleep(5)
+        XCTAssertTrue(result.exists, "the transcript disappeared again")
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "a spinner replaced the transcript")
+
+        // Again with the model loaded and a very short recording: the transcription is done almost
+        // at once (the case that still showed a lasting spinner on a device).
+        for round in 1...3 {
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.buttons["recordButton"].waitForExistence(timeout: 10))
+            app.buttons["recordButton"].tap()
+            XCTAssertTrue(app.staticTexts["elapsed"].waitForExistence(timeout: 5))
+            sleep(1)
+            app.buttons["stopButton"].tap()
+            XCTAssertTrue(transcribe.waitForExistence(timeout: 15), "round \(round): the new recording did not open")
+            transcribe.tap()
+            let quick = app.descendants(matching: .any).matching(
+                NSPredicate(format: "elementType == %d OR label == 'No speech recognised.'", XCUIElement.ElementType.link.rawValue)).firstMatch
+            XCTAssertTrue(quick.waitForExistence(timeout: 30), "round \(round): no transcript appeared")
+            sleep(3)
+            XCTAssertFalse(app.activityIndicators.firstMatch.exists, "round \(round): a spinner replaced the transcript")
+        }
+    }
+
     /// About: settings persist, attribution and licences are shown, the three links are there.
     @MainActor
     func testAboutScreen() {
@@ -213,9 +301,14 @@ final class LaunchTests: XCTestCase {
         let toggle = app.switches["autoTranscribeToggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         let before = toggle.value as? String
+        XCTAssertEqual(before, "0", "--reset starts with Transcribe automatically off")
         toggle.switches.firstMatch.tap()
         XCTAssertNotEqual(toggle.value as? String, before)
-        let attribution = app.staticTexts["Speech recognition (Voz) and speaker recognition (Who) by Desert Ant Labs (https://desertant.com)"]
+        let tips = app.descendants(matching: .any)["phoneCallTipsLink"]  // iPhone only
+        for _ in 0..<6 where !tips.exists { app.swipeUp() }
+        XCTAssertTrue(tips.exists)
+        // "Desert Ant Labs" is a link inside the text: match the rendered text, not the markdown.
+        let attribution = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Speech recognition (Voz) and speaker recognition (Who) by Desert Ant Labs'")).firstMatch
         for _ in 0..<8 where !attribution.isHittable { app.swipeUp() }
         XCTAssertTrue(attribution.exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'NVIDIA Parakeet TDT 0.6B v3' AND label CONTAINS 'CC BY 4.0'")).firstMatch.exists)

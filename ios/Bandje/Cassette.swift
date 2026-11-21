@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import BandjeKit
 import SwiftUI
 import UIKit
 
@@ -492,10 +493,14 @@ struct CoverArt: View {
     /// The recording's cover, kept next to it as `.cover-<key>.jpg` (hidden; the key changes with
     /// the title and length, so a renamed recording gets a new one). Made when missing.
     @MainActor static func file(for recording: Recording) -> URL? {
-        guard recording.audio != nil else { return nil }
+        // Audio still in iCloud: its length (part of the key) is not known for sure yet.
+        guard recording.audio != nil, recording.audioIsLocal else { return nil }
         let name = ".cover-\(key(for: recording)).jpg"
         let url = recording.folder.appending(path: name)
         if FileManager.default.fileExists(atPath: url.path) { return url }
+        // A title or colour from `.bandje.json` that is not the newest yet: no new cover file into
+        // the shared folder (it would replace the other device's).
+        guard CoverPolicy.isUpToDate(RecordingMeta.url(in: recording.folder)) else { return nil }
         guard let data = jpeg(title: recording.title, duration: recording.duration, color: recording.color) else { return nil }
         let old = (try? FileManager.default.contentsOfDirectory(atPath: recording.folder.path)) ?? []
         for file in old where file.hasPrefix(".cover-") { try? FileManager.default.removeItem(at: recording.folder.appending(path: file)) }

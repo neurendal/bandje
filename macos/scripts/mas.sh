@@ -28,11 +28,22 @@ if [ $DEV = 1 ] && pgrep -f "$HOME/Applications/Bandje.app/Contents/MacOS/Bandje
 fi
 [ $DIRTY = 1 ] || [ -z "$(git status --porcelain -- Sources Resources mas Package.swift models.lock.json)" ] \
   || die "Uncommitted changes. Commit first, or use --dirty."
+CORE="$ROOT/../bandje-core"
+[ -d "$CORE/.git" ] || die "../bandje-core not found (the shared package BandjeKit, next to this repo)"
+[ $DIRTY = 1 ] || [ -z "$(git -C "$CORE" status --porcelain)" ] \
+  || die "Uncommitted changes in ../bandje-core. Commit first, or use --dirty."
 
 # The build number only has to rise with every upload; a timestamp always does.
 BUILD="$(date +%Y%m%d.%H%M)"
 VERSION="$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)"
 COMMIT="$(git rev-parse --short HEAD)"
+CORE_COMMIT="$(git -C "$CORE" rev-parse --short HEAD)"
+# The public repo has one bandje-core for both apps (owner, 2026-11-08): say so early when the other
+# app's last upload was built with a different core (publishing then needs a new build of both).
+OTHER_CORE="$(git -C "$CORE" for-each-ref --sort=-creatordate --count=1 --format='%(refname:short)' 'refs/tags/ios-build/*')"
+if [ -n "$OTHER_CORE" ] && ! git -C "$CORE" diff --quiet "$OTHER_CORE" HEAD; then
+  printf '\033[33m! bandje-core changed since the last iOS upload (%s). To publish the source, iOS needs a build with this core too (publish.sh both).\033[0m\n' "$OTHER_CORE"
+fi
 OUT="$ROOT/build/mas/$BUILD"
 mkdir -p "$OUT"
 
@@ -43,9 +54,11 @@ make test >/dev/null || die "make test fails, no build."
 say "Info.plist $VERSION ($BUILD), project"
 cp Resources/Info.plist build/mas/Info.plist
 plutil -replace CFBundleVersion -string "$BUILD" build/mas/Info.plist
+# Filled in by Xcode from mas/project.yml (ProStatusExporter reads it).
+plutil -replace BandjeAppGroup -string '$(BANDJE_APP_GROUP)' build/mas/Info.plist
 xcodegen generate --spec mas/project.yml --quiet
 
-say "Archive (commit $COMMIT)"
+say "Archive (commit $COMMIT, bandje-core $CORE_COMMIT)"
 # The iCloud entitlement needs a provisioning profile for every signature: the archive is signed for
 # development (this Mac must be registered with the team; -allowProvisioningDeviceRegistration does
 # that the first time), the export re-signs it for the App Store or for development (--dev).
@@ -63,6 +76,10 @@ for s in --selftest --probe-permissions FakeMic PermissionProbe; do
   strings -a "$APP/Contents/MacOS/Bandje" | grep -q -- "$s" && die "DEBUG test hook '$s' in the release binary"
 done
 [ -f "$APP/Contents/Resources/Models/voz/meta.json" ] || die "models missing in the app"
+# The App Group (docs/pro-sharing.md): filled in in Info.plist and signed into the entitlements.
+GROUP="$(plutil -extract BandjeAppGroup raw "$APP/Contents/Info.plist" 2>/dev/null)"
+case "$GROUP" in ""|*'$('*) die "BandjeAppGroup not filled in: '$GROUP'" ;; esac
+codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "<string>$GROUP</string>" || die "App Group $GROUP not in the entitlements"
 
 DEST=export; [ $UPLOAD = 1 ] && DEST=upload
 METHOD=app-store-connect; [ $DEV = 1 ] && METHOD=debugging
@@ -92,6 +109,8 @@ if [ $DEV = 1 ]; then
 elif [ $UPLOAD = 1 ]; then
   # Which code is in which TestFlight build: a tag per upload.
   git tag "build/$BUILD" "$COMMIT" 2>/dev/null || true
+  # The same tag on bandje-core: the export publishes BandjeKit as it was in this build (GPL source).
+  git -C "$CORE" tag "build/$BUILD" "$CORE_COMMIT" 2>/dev/null || true
   say "Uploaded: Bandje $VERSION ($BUILD), commit $COMMIT. App Store Connect processes it in 5-30 minutes."
 else
   say "Exported: $OUT/export (Bandje $VERSION ($BUILD), commit $COMMIT). Upload with Transporter or --upload."

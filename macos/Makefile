@@ -23,11 +23,15 @@ app: build
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp "$$(swift build -c $(CONFIG) --show-bin-path)/Bandje" $(APP)/Contents/MacOS/Bandje
+	@# SwiftPM records the deployment target (15.0) as the SDK version; macOS then shows the app in
+	@# its compatibility look (no Liquid Glass). Record the real SDK, as the Xcode (App Store) build does.
+	vtool -set-build-version macos 15.0 "$$(xcrun --sdk macosx --show-sdk-version)" -replace \
+		-output build/Bandje.vtool $(APP)/Contents/MacOS/Bandje && mv build/Bandje.vtool $(APP)/Contents/MacOS/Bandje
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
 	cp Resources/Logo.png $(APP)/Contents/Resources/Logo.png
-	xcrun actool Resources/Assets.xcassets --compile $(APP)/Contents/Resources --platform macosx \
-		--minimum-deployment-target 15.0 --output-partial-info-plist build/assets-partial.plist >/dev/null
+	xcrun actool "$(CURDIR)/Resources/Assets.xcassets" --compile "$(CURDIR)/$(APP)/Contents/Resources" --platform macosx \
+		--minimum-deployment-target 15.0 --output-partial-info-plist "$(CURDIR)/build/assets-partial.plist" >/dev/null
 	cp Resources/PrivacyInfo.xcprivacy $(APP)/Contents/Resources/PrivacyInfo.xcprivacy
 	cp -R Resources/Localization/*.lproj $(APP)/Contents/Resources/
 	python3 -I scripts/make-help.py build $(APP)
@@ -68,7 +72,7 @@ selftest:
 
 selftest-quick:
 	$(MAKE) app
-	./scripts/selftest.sh static nomodels dictate memo help menu micswitch leaks
+	./scripts/selftest.sh static nomodels dictate memo help menu purchases micswitch leaks
 
 install:
 	$(MAKE) app CONFIG=release

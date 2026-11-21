@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AVFoundation
+import BandjeKit
 import Foundation
 import SwiftUI
 
@@ -14,7 +15,7 @@ enum WebExport {
         var markdown: String
     }
 
-    /// The only URL in our code besides the About links (CLAUDE.md limit 1).
+    /// The only URL in our code besides the About links.
     static let siteURL = "https://band.je"
 
     /// Summaries in the recording's folder: the iPhone's `<title> <word>.md` and the Mac's
@@ -39,6 +40,7 @@ enum WebExport {
     static func export(_ recording: Recording, transcript: Transcript) async throws -> URL {
         var audio: (base64: String, type: String)?
         if let file = recording.audio {
+            try await Playback.ensureDownloaded(file)  // audio from another device may still be in iCloud
             audio = (try await compactAudio(file).base64EncodedString(), "audio/mp4")
         }
         let logo = await logoPNG()?.base64EncodedString()
@@ -94,10 +96,9 @@ enum WebExport {
 
             let inBuffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: 32_768)!
             let ratio = mono.sampleRate / input.processingFormat.sampleRate
-            // `read` throws at the end of the file instead of returning 0 frames: stop before it.
-            while input.framePosition < input.length {
-                try input.read(into: inBuffer)
-                if inBuffer.frameLength == 0 { break }
+            // readNext (BandjeKit): false at the end, also when the file promised a few frames
+            // more than it holds (AAC taken out of a video).
+            while try input.readNext(into: inBuffer) {
                 let outBuffer = AVAudioPCMBuffer(pcmFormat: mono, frameCapacity: AVAudioFrameCount(Double(inBuffer.frameLength) * ratio) + 1024)!
                 var fed = false
                 var error: NSError?
@@ -202,6 +203,8 @@ enum WebExport {
         }
         let joined = TranscriptWriter.joinConsecutive(t.segments)
         var turns = ""
+        let markers = t.markerSet
+        let placed = markers.placed(in: joined.map(\.start))
         for (i, seg) in joined.enumerated() {
             let n = (labels.firstIndex(of: seg.speaker) ?? 0) % 6
             let end = i + 1 < joined.count ? joined[i + 1].start : max(seg.end, t.duration)
@@ -209,6 +212,12 @@ enum WebExport {
                 + "<a class=\"t\" data-t=\"\(seg.start)\">\(TranscriptWriter.shortClock(seg.start))</a>"
                 + "<span class=\"who\">\(escape(t.name(of: seg.speaker)))</span>"
                 + "<p>\(escape(seg.text))</p></div>\n"
+            // Markers under the turn they fall in, as in the app: the flag and time play from there
+            // (specs/markers.md 6).
+            for time in placed[i] ?? [] {
+                turns += "<div class=\"marker\"><a class=\"t\" data-t=\"\(time)\">🚩 \(TranscriptWriter.shortClock(time))</a>"
+                    + (markers.note(at: time).map { " <span>\(escape($0))</span>" } ?? "") + "</div>\n"
+            }
         }
         if joined.isEmpty { turns = "<p class=\"muted\">\(escape(String(localized: "No speech recognised.")))</p>" }
         tabs.append(("transcript", String(localized: "Transcript"), "<section class=\"turns\">\n" + turns + "</section>"))
@@ -295,6 +304,7 @@ enum WebExport {
     .summary p{margin:6px 0}
     a.t{color:var(--accent);text-decoration:none;font-variant-numeric:tabular-nums;cursor:pointer}
     a.t:hover{text-decoration:underline}
+    .marker{margin:0 10px 8px 74px;font-size:14px}
     .turn{display:grid;grid-template-columns:52px 1fr;column-gap:12px;padding:10px 10px;border-radius:10px;cursor:pointer}
     .turn:hover{background:var(--card)}
     .turn.now{background:var(--hl)}
@@ -304,7 +314,7 @@ enum WebExport {
     .c0 .who{color:var(--c0)}.c1 .who{color:var(--c1)}.c2 .who{color:var(--c2)}.c3 .who{color:var(--c3)}.c4 .who{color:var(--c4)}.c5 .who{color:var(--c5)}
     dl.info{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin-top:20px}
     dt{color:var(--muted)}dd{margin:0}
-    @media (max-width:520px){.turn{grid-template-columns:1fr}.turn a.t{grid-row:auto}}
+    @media (max-width:520px){.turn{grid-template-columns:1fr}.turn a.t{grid-row:auto}.marker{margin-left:10px}}
     """
 
     private static let script = """

@@ -1,10 +1,12 @@
 import AppKit
+import BandjeKit
 import SwiftUI
 
 /// "Over Bandje": icon, name, version, what goes over the network, the two models in
 /// two aligned columns, Neurendal B.V. as maker, and the Desert Ant Labs credit (SDK license,
-/// section 9: name in context, linked to desertant.com), and the website band.je. These three links are the only URLs in our
-/// code; they open the browser, Bandje itself connects to nothing.
+/// section 9: name in context, linked to desertant.com), and the website band.je. These links only
+/// open the browser; Bandje itself connects to nothing. The other URL in our code is the band.je link
+/// in the shared web page (`WebExport.siteURL`); the welcome reuses `neurendal` (CLAUDE.md, hard limit 1).
 @MainActor
 enum AboutWindow {
     private static var window: NSWindow?
@@ -19,9 +21,7 @@ enum AboutWindow {
         w.isReleasedWhenClosed = false
         w.center()
         window = w
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
-            MainActor.assumeIsolated { window = nil }
-        }
+        w.onClose { window = nil }
         NSApp.activate()
         w.makeKeyAndOrderFront(nil)
     }
@@ -37,7 +37,12 @@ struct AboutView: View {
     /// Also the "Met liefde gemaakt door Neurendal" link on the welcome.
     static let neurendal = URL(string: "https://neurendal.com")!
     private static let desertAnt = URL(string: "https://desertant.com")!
-    private static let website = URL(string: "https://band.je")!
+    /// band.je in the app's language (English at the root, the others under /nl/ and so on).
+    static let website = site("/")
+
+    static func site(_ page: String, localization: String? = Bundle.main.preferredLocalizations.first) -> URL {
+        URL(string: "https://band.je" + SitePath.path(page, localization: localization))!
+    }
 
     var body: some View {
         VStack(spacing: 0) {

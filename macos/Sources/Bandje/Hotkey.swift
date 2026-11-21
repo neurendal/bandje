@@ -7,6 +7,8 @@ import Carbon.HIToolbox
 enum Hotkey {
     enum ID: UInt32 {
         case record = 1, dictate, dictateReturn, dictateEnter, dictateEscape
+        /// Markeer dit moment: registered only while recording (specs/markers.md).
+        case mark
     }
 
     private struct Handlers {
@@ -18,7 +20,7 @@ enum Hotkey {
     private static var refs: [UInt32: EventHotKeyRef] = [:]
     private static var eventHandler: EventHandlerRef?
 
-    /// Returns the OSStatus of the registration (noErr on success, also when already registered).
+    /// Returns the OSStatus of the registration (noErr on success). An earlier registration of `id` is replaced.
     @discardableResult
     static func register(_ id: ID, key: Int, modifiers: Int = 0, pressed: @escaping () -> Void,
                          released: (() -> Void)? = nil) -> OSStatus {
@@ -39,7 +41,8 @@ enum Hotkey {
             guard status == noErr else { return status }
         }
         handlers[id.rawValue] = Handlers(pressed: pressed, released: released)
-        if refs[id.rawValue] != nil { return noErr }
+        // Registered before (perhaps with another key, after a change in Settings): that key goes.
+        if let old = refs.removeValue(forKey: id.rawValue) { UnregisterEventHotKey(old) }
         var ref: EventHotKeyRef?
         let hk = EventHotKeyID(signature: OSType(0x424E_444A), id: id.rawValue) // 'BNDJ'
         let status = RegisterEventHotKey(UInt32(key), UInt32(modifiers), hk, GetApplicationEventTarget(), 0, &ref)

@@ -8,7 +8,8 @@ Band·je records two things at once: your microphone and all sound your Mac play
 
 - While recording, the cassette in the menu bar turns red, its reels turn and the time runs next to it in red.
 - Your Mac does not go to sleep while Band·je records.
-- The first time, macOS asks for permission to record your Mac's audio. Allow it, or Band·je can only hear your microphone.
+- Heard something important? Press ⌃⌥⌘M to mark that moment, see [Markers](#player).
+- macOS asks for permission to record your Mac's audio when you click **Allow…** in the welcome or under Settings › Access, or else at the first recording. Allow it, or Band·je can only hear your microphone. At the start of every recording Band·je checks it, silently, and warns you right away when it is off.
 - If your microphone stays silent for six seconds, or the lid is closed while the built-in microphone is in use, Band·je warns you and offers to switch to another microphone.
 
 Let the other people know you are recording. In some countries, and for business use, the law requires it, and sometimes you need their consent too. You are responsible for following the law that applies to you. Band·je reminds you once, before your first recording.
@@ -36,7 +37,7 @@ The menu shows the progress. You can start a new recording while Band·je transc
 For the best result, wear headphones during a call. Without them, your microphone also picks up the other side from your speakers. Band·je filters most of that out, but not all.
 
 ### Transcribing another file
-Choose **Transcribe File…** to transcribe any audio file, such as a voice memo from your iPhone. Band·je copies the audio to its own folder in your recordings folder and puts the transcript next to it. The original stays where it was.
+Choose **Transcribe File…** to transcribe any audio or video file, such as a voice memo from your iPhone or a video call you saved. Band·je copies it to its own folder in your recordings folder and puts the transcript next to it; of a video it keeps only the sound. The original stays where it was. You can add [markers](#player) to it as to your own recordings.
 
 ## Naming speakers {#speakers}
 Give the speakers in a transcript their real names.
@@ -50,33 +51,41 @@ On a phone line with a menu or hold music, Band·je sometimes hears more speaker
 ## The Band·je window {#player}
 All your recordings in one window: listen, read along, search, name speakers, summarize and share.
 
-Choose **Open Band·je** in the menu (⌘O). The window also opens when you start Band·je yourself, for example from Launchpad or Spotlight. **Open in Band·je** opens the current recording. While the window is open, Band·je is in the Dock and in ⌘Tab; close it and Band·je is back in the menu bar only. Turn on **Always in the Dock** in [Settings](#settings) to keep the icon. The first time, the window always opens, with the permissions, each with its own button. Close the window and Band·je stays in the menu bar; quit Band·je from that menu.
+Choose **Open Band·je** in the menu (⌘O). The window also opens when you start Band·je yourself, for example from Launchpad or Spotlight. **Open in Band·je** opens the current recording. While the window is open, Band·je is in the Dock and in ⌘Tab; close it and Band·je is back in the menu bar only. Turn on **Always in the Dock** in [Settings](#settings) to keep the icon. The first time, the window always opens with a welcome in two steps: first the shortcuts, then **Next** to the permissions, each with its own button. Close the window and Band·je stays in the menu bar; quit Band·je from that menu.
 
 - On the left: your recordings per day, with the time, the length and the first words of the transcript. Search finds titles and words in transcripts. At the bottom is **Start Recording**; while you record, the new recording is at the top with a red dot, and when you stop, the window opens it.
-- On the right: the recording with the cassette, the position bar and the play button (Space). Click a sentence to listen from there; while playing, the sentence you hear lights up and the transcript follows. **Search Transcript** (⌘F) finds words.
+- On the right: the recording with the cassette, the position bar and the play button (Space). Click a sentence to listen from there; while playing, the sentence you hear lights up and the transcript follows. ⌘← and ⌘→ skip 15 seconds back and forward. **Search Transcript** (⌘F) finds words.
+- Every recording remembers where you left off, also after a restart; the speed applies to all recordings. Only the recording you see plays: open another recording or close the window and playback stops. Starting a recording or dictation pauses it. When you stop a recording, the window opens with it; choose **Transcribe File…** or a template under **Summarize** in the menu and the window opens with that recording, showing the progress.
 - Next to **Transcript** is the **Summary** tab. Without a summary yet, it holds **Summarize**: choose a template, see [Summaries](#summaries). Every summary gets its own tab; **Another Summary** makes one more.
 - No transcript yet (a recording from your iPhone, for example)? Click **Transcribe**.
-- **Share**: **Audio…**, **Transcript (.md)…**, **Transcript as PDF…** or **Web Page with Audio…**: one file with the player, the transcript, the summaries and the audio, which works in any browser, also offline. **Web Page with Audio, Compact (for Email)…** makes the audio smaller. The page has a link to band.je and nothing else.
-- On paper: **Print…** (⌘P, or in **Share**) prints the transcript, the same as the PDF.
+- **Share**: **Audio…** and **Audio Page…** share the recording. **Share As…**, **Copy As…** and **Save As…** first ask **PDF**, **Text** or **Markdown** and are one document: the summaries first, then the transcript. With summaries you also check there what goes in (everything is checked). **Save As…** saves it where you want, **Copy As…** puts it on the clipboard. **Audio Page…** is one file with the player, the transcript, the summaries and the audio, which works in any browser, also offline. **Audio Page, Compact (for Email)…** makes the audio smaller. The page has a link to band.je and nothing else.
+- On paper: **Print…** (⌘P, or in **Share**) prints the same document as the PDF.
+- Copying: **Copy** next to a summary puts its text on the clipboard. You can also select text and press ⌘C.
 - **More**: **Name and Colour…** (or click the title on the cassette): the name and the cassette's colour, **Name Speakers…**, **Show in Finder**, **Delete…** (to the Trash).
 - You can also delete a recording from the list: right-click it and choose **Delete…**, or select it and press ⌫. Band·je asks first.
 
+### Markers
+A marker is a small flag at a moment in the recording, so you can find it again.
+
+- While recording: press ⌃⌥⌘M, choose **Mark This Moment** in the menu, or click the flag next to the stop button in the window. A short sound confirms it.
+- While listening: click the flag to the right of the play button, or press ⌘D or ⌃⌥⌘M. The marker goes where you are in the recording.
+- The flags show on the position bar and in the transcript, before the sentence the marker falls in. Under the paragraph is the marker's time: click it to listen from there. Without a transcript yet, the markers are listed under **Transcribe**.
+- A note: click **Add a note…** under the marker, type one line and click **Save**. While playing, the note shows above the position bar for a moment when you reach the marker. Clear the field to remove the note; the marker stays.
+- Removing: right-click the marker and choose **Remove Marker**. Made a mistake? Click **Undo** in the message that stays for a few seconds.
+- Markers and notes are also in the transcript (`.md`), the PDF, the printout and the web page, as a line `🚩 12:34 note` under the paragraph the marker falls in. When you sync with iCloud, markers set on your iPhone show on your Mac, and the other way round.
+
 ## Dictation {#dictation}
-Press ⌃⌥⌘D, speak, and the text appears where your cursor is: in a chat, an email, an editor or Terminal.
+Press ⌃⌥⌘D, speak, and your text is on the clipboard. Paste it with ⌘V where your cursor is: in a chat, an email, an editor or Terminal.
 
 There are two ways to use the shortcut:
 
 - **Tap** ⌃⌥⌘D: Band·je listens until you press Return, or ⌃⌥⌘D again. The Return itself is not sent to the app.
-- **Hold** ⌃⌥⌘D: Band·je listens while you hold the keys and pastes when you let go.
+- **Hold** ⌃⌥⌘D: Band·je listens while you hold the keys and puts the text on the clipboard when you let go.
 
 Press Esc to cancel. The menu bar icon turns orange while Band·je listens, with the time next to it. One dictation can last up to five minutes; in the last 30 seconds the time blinks.
 
 ### Pasting
-The text is always on the clipboard. To paste it for you, Band·je needs permission to send a keystroke (⌘V): choose **Turn On Automatic Pasting…** in the menu, or go to System Settings > Privacy & Security > Accessibility and turn on Band·je. Without it, you paste with ⌘V yourself.
-
-macOS tells a running Band·je about this permission only after a restart. Just turned it on? Choose **Restart Band·je for Automatic Pasting** in the menu, or **Restart Band·je** in [Settings](#settings).
-
-If you hear a short sound instead of a paste, a password field or another app has turned on secure input (Terminal's Secure Keyboard Entry, a password manager). macOS then blocks the paste; the text is on the clipboard, so press ⌘V yourself.
+After dictating, the text is on the clipboard and ⌘V shows next to the cassette for a moment. Press ⌘V to paste it where your cursor is. The text stays on the clipboard until you copy something else, so you can also paste it later or in more places.
 
 Nothing you dictate is saved.
 
@@ -152,7 +161,7 @@ Turn on **Open Band·je at login** and Band·je appears in the menu bar by itsel
 Band·je follows the language of macOS. To use another language for Band·je only, choose it here and click **Restart Band·je**. Menus, windows, new transcripts and Help switch. **Same as macOS** goes back.
 
 ### Keyboard Shortcuts
-Click a field and press the new combination. It must include ⌘, ⌃ or ⌥, or be a function key. Esc cancels, **Restore Defaults** brings back ⌃⌥⌘R and ⌃⌥⌘D.
+Click a field and press the new combination. It must include ⌘, ⌃ or ⌥, or be a function key. Esc cancels, **Restore Defaults** brings back ⌃⌥⌘R, ⌃⌥⌘D and ⌃⌥⌘M. ⌃⌥⌘M (**Mark This Moment**) works everywhere while recording, and otherwise in the Band·je window. When not recording, another app can use the same combination.
 
 If another app already uses the combination, Band·je tells you and keeps the old one.
 
@@ -170,7 +179,25 @@ Click **Change…** and choose a folder, anywhere on your Mac or on an external 
 If the folder is in iCloud Drive, Dropbox or another cloud service (also Desktop and Documents when they are in iCloud), Band·je warns you: your recordings then leave your Mac through that service.
 
 ### Access
-Whether Band·je may use the microphone, paste for you and record the sound of your Mac, each with its own button (**Allow…** or **Open Settings…**). A green check mark means allowed; the state updates by itself when you come back from System Settings. See [Troubleshooting](#troubleshooting).
+Whether Band·je may use the microphone and record the sound of your Mac, each with its own button (**Allow…** or **Open Settings…**). A green check mark means allowed; the state updates by itself when you come back from System Settings. See [Troubleshooting](#troubleshooting).
+
+## Band·je Unlimited {#purchases}
+What is free, what the two purchases unlock, and how to restore them (Band·je from the App Store).
+
+Band·je is free. Recording is always free and never limited.
+
+- **Transcribing** is free for your first 5 recordings. A recording counts once, when its first transcription finishes; transcribing it again is free.
+- **Dictation** is free for 15 minutes of dictated audio in total. A dictation that is running when the minutes run out finishes normally. After 10 minutes Band·je says once how many free minutes are left; the menu bar menu shows it too.
+- What you already have stays yours: transcripts, summaries, sharing and exports are never locked. Summaries are free on every transcript.
+
+Two purchases, each paid once, no subscription:
+
+- **Band·je Unlimited**: transcribing and dictation without limit.
+- **Band·je Dictation**: dictation without limit.
+
+Buy them in **Settings… › Purchases**, or choose **Buy Band·je Unlimited…** in the Band·je menu while the window is open. Once the free transcriptions are used, **Transcribe** shows Band·je Unlimited first; an automatic transcription doesn't start, and the recording says so.
+
+If you bought Band·je before it was free, everything is unlocked without doing anything. A purchase works on every Mac, iPhone and iPad with the same Apple Account, and with Family Sharing. On another Mac, choose **Restore Purchases**. The free part counts per device. The welcome window says what is free, with **Already bought it? Restore Purchases**.
 
 ## Privacy and network {#privacy}
 Your audio, transcripts and summaries never leave your Mac.
@@ -199,15 +226,14 @@ Solutions for things that can go wrong.
 Many problems come from a missing permission. Choose **Settings…** and look under **Access**:
 
 - **Microphone**: needed to record your voice and to dictate.
-- **Sound from your Mac**: needed to record the other side. macOS doesn't let apps read this permission, so Band·je shows what happened in the last recording: sound came in, or it was silent. Silent is normal if nothing was playing.
-- **Automatic pasting**: needed to paste dictated text for you.
+- **Sound from your Mac**: needed to record the other side. macOS doesn't let apps read this permission, so Band·je checks it itself: it plays an inaudible signal for half a second that never reaches your speakers or AirPods, and looks whether it comes in. **Allow…** makes macOS ask; after **Open Settings…** the check mark appears once you switched Band·je on.
 
 A green check mark means allowed. Otherwise click **Open Settings…**, turn Band·je on and come back; Band·je notices by itself.
 
-Each time Band·je starts, it checks the microphone and automatic pasting, and tells you if one is missing. Don't need automatic pasting? Tick **Do not show this message again**, or turn off **Warn at launch when something is missing** under Access.
+Each time Band·je starts, it checks the microphone, and the sound of your Mac if that was off, and tells you if one is missing. Don't want the message? Tick **Do not show this message again**, or turn off **Warn at launch when something is missing** under Access.
 
 ### The other side is missing from the recording
-macOS didn't allow Band·je to record your Mac's audio. Go to System Settings > Privacy & Security > Screen & System Audio Recording and turn on Band·je under System Audio Recording Only.
+macOS didn't allow Band·je to record your Mac's audio. Band·je warns you about this at the start of a recording. Go to System Settings > Privacy & Security > Screen & System Audio Recording and turn on Band·je under System Audio Recording Only. Still not working right after? Restart Band·je.
 
 ### My own voice is missing
 Check the **Microphone** menu. With the lid closed, the built-in microphone is off: choose another one. If Band·je may not use the microphone at all, turn it on in System Settings > Privacy & Security > Microphone.

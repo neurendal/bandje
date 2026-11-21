@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AVFoundation
 import BackgroundTasks
+import BandjeKit
 import Foundation
 import Observation
 import Voz
@@ -43,7 +44,10 @@ struct Transcript: Equatable, Sendable {
     /// Names the user gave, keyed by the original label ("Spreker 1").
     var speakerNames: [String: String] = [:]
     var audioFile: String? = nil
+    /// A copy of the recording's markers (`.bandje.json`) and their notes (`.markers.json`), so the
+    /// `.json` and `.md` have them (specs/markers.md 3). The folder's files are the source.
     var markers: [Double] = []
+    var markerNotes: [String: String] = [:]
     /// When the recording was made, and where (if "Store GPS location" was on).
     var recorded: Date? = nil
     var location: RecordedLocation? = nil
@@ -51,6 +55,11 @@ struct Transcript: Equatable, Sendable {
     func name(of label: String) -> String {
         let name = speakerNames[label]?.trimmingCharacters(in: .whitespaces) ?? ""
         return name.isEmpty ? label : name
+    }
+
+    var markerSet: Markers {
+        get { Markers(times: markers, notes: markerNotes) }
+        set { markers = newValue.times; markerNotes = newValue.notes }
     }
 
     /// Original labels in order of first appearance (empty labels left out).
@@ -174,31 +183,56 @@ enum TranscriptWriter {
         return lines
     }
 
-    static func elapsed(_ seconds: Double) -> String {
-        Duration.seconds(max(0, seconds.rounded())).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))
-    }
-
     /// Title, the header lines, a rule, then per turn "**0:01 · Speaker 1**" with the text on the
     /// next line (a Markdown hard break: two spaces before the newline).
-    static func markdown(_ t: Transcript) -> String {
+    ///
+    /// Shared (specs/share.md): the chosen summaries go between the header and the turns, each under
+    /// its own heading; `turns: false` leaves the turns out (the title block stays).
+    static func markdown(_ t: Transcript, summaries: [Summaries.Part] = [], turns includeTurns: Bool = true) -> String {
         var out = "# \(t.title)\n\n" + headerLines(t).joined(separator: "  \n") + "\n\n---\n\n"
+        for (i, s) in summaries.enumerated() {
+            // The summary's own headings one level down, under its heading.
+            let body = s.body.components(separatedBy: "\n").map { $0.hasPrefix("#") ? "#" + $0 : $0 }.joined(separator: "\n")
+            out += "## \(s.heading)\n\n\(body)\n\n"
+            if includeTurns || i < summaries.count - 1 { out += "---\n\n" }
+        }
+        guard includeTurns else { return out.trimmingCharacters(in: .newlines) + "\n" }
+        if !summaries.isEmpty { out += "## " + String(localized: "Transcript") + "\n\n" }
         let joined = joinConsecutive(t.segments)
         if joined.isEmpty { out += "_" + String(localized: "No speech recognised.") + "_\n" }
-        for seg in joined {
+        let flags = markerLines(t, turns: joined)
+        for (i, seg) in joined.enumerated() {
             let time = shortClock(seg.start)
             let head = seg.speaker.isEmpty ? time : "\(time) · \(t.name(of: seg.speaker))"
             out += "**\(head)**  \n\(seg.text)\n\n"
+            for line in flags[i] ?? [] { out += line + "\n\n" }
         }
         return out
     }
 
     /// Plain text for sharing: the title and header lines, then "0:01 · Speaker 1" and the text per turn.
-    static func plainText(_ t: Transcript) -> String {
-        let turns = joinConsecutive(t.segments).map { seg in
+    /// Shared: the chosen summaries (heading, then body) between the header and the turns.
+    static func plainText(_ t: Transcript, summaries: [Summaries.Part] = [], turns includeTurns: Bool = true) -> String {
+        let joined = includeTurns ? joinConsecutive(t.segments) : []
+        let flags = markerLines(t, turns: joined)
+        let turns = joined.enumerated().map { i, seg in
             let time = shortClock(seg.start)
             return (seg.speaker.isEmpty ? time : "\(time) · \(t.name(of: seg.speaker))") + "\n" + seg.text
+                + (flags[i] ?? []).map { "\n" + $0 }.joined()
         }
-        return ([t.title + "\n" + headerLines(t).joined(separator: "\n")] + turns).joined(separator: "\n\n") + "\n"
+        let parts = summaries.map { $0.heading + "\n\n" + Summaries.plainText($0.body) }
+        let heading = summaries.isEmpty || !includeTurns ? [] : [String(localized: "Transcript")]
+        return ([t.title + "\n" + headerLines(t).joined(separator: "\n")] + parts + heading + turns).joined(separator: "\n\n") + "\n"
+    }
+
+    /// Per turn (index in `turns`): the marker lines "🚩 12:34 note" that go right after its text,
+    /// as the transcript screen shows them under the paragraph (specs/markers.md 6). The same in
+    /// the `.md`, the text and the PDF.
+    static func markerLines(_ t: Transcript, turns: [Segment]) -> [Int: [String]] {
+        let markers = t.markerSet
+        return markers.placed(in: turns.map(\.start)).mapValues { times in
+            times.map { markers.line(at: $0, clock: shortClock) }
+        }
     }
 
     static func json(_ t: Transcript) throws -> Data {
@@ -218,7 +252,8 @@ enum TranscriptWriter {
             "segments": segments,
             "speakerNames": t.speakerNames,
             "audio": t.audioFile.map { $0 as Any } ?? NSNull(),
-            "markers": t.markers,
+            "markers": t.markers.map { NSDecimalNumber(string: Markers.key($0)) },
+            "markerNotes": t.markerNotes,
             "recorded": t.recorded.map { ISO8601DateFormatter().string(from: $0) as Any } ?? NSNull(),
             "location": t.location.map { ["latitude": $0.latitude, "longitude": $0.longitude, "accuracy": $0.accuracy] as Any } ?? NSNull(),
         ]
@@ -244,6 +279,7 @@ enum TranscriptWriter {
                           whoVersion: models["who"] as? String, segments: segments,
                           speakerNames: o["speakerNames"] as? [String: String] ?? [:],
                           audioFile: o["audio"] as? String, markers: o["markers"] as? [Double] ?? [],
+                          markerNotes: o["markerNotes"] as? [String: String] ?? [:],
                           recorded: (o["recorded"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) },
                           location: (o["location"] as? [String: Double]).flatMap { l in
                               guard let lat = l["latitude"], let lon = l["longitude"] else { return nil }
@@ -258,7 +294,6 @@ enum TranscriptWriter {
         try Storage.coordinated(writing: url, options: .forReplacing) { try json(t).write(to: $0, options: .atomic) }
     }
 
-    /// Text for library search: all words plus speaker names.
     /// The text to search (speaker names and all words) and the transcript's first words for the list.
     static func searchText(json url: URL) -> (search: String, preview: String)? {
         guard let t = try? read(json: url) else { return nil }
@@ -389,15 +424,13 @@ final class MonoReader {
         while pending.count < count, !finished {
             var readError: Error?
             let status = converter.convert(to: outBuf, error: nil) { [self] _, inputStatus in
-                // Reading at the end throws instead of returning 0 frames: stop on the position.
-                let remaining = file.length - file.framePosition
-                if inputDone || remaining <= 0 { inputDone = true; inputStatus.pointee = .endOfStream; return nil }
-                do {
-                    try file.read(into: inBuf, frameCount: AVAudioFrameCount(min(Int64(inBuf.frameCapacity), remaining)))
-                } catch {
-                    readError = error
+                // readNext (BandjeKit): false at the end, also when the file promised a few frames
+                // more than it holds (AAC taken out of a video).
+                var more = false
+                if !inputDone {
+                    do { more = try file.readNext(into: inBuf) } catch { readError = error }
                 }
-                if inBuf.frameLength == 0 || readError != nil {
+                guard more else {
                     inputDone = true
                     inputStatus.pointee = .endOfStream
                     return nil
@@ -668,11 +701,18 @@ final class Transcriptions {
     private(set) var phases: [URL: Transcriber.Phase] = [:]
     /// The last failure per folder (shown in the detail screen until the next attempt).
     var errors: [URL: String] = [:]
+    /// Counts transcripts written per folder, so an open screen reloads one that was replaced in
+    /// place ("Transcribe again" keeps the file name).
+    private(set) var written: [URL: Int] = [:]
+
+    func generation(of folder: URL) -> Int { written[folder.standardizedFileURL] ?? 0 }
     /// Outcome of the last background-task submission (selftest).
     private(set) var lastSubmitError: String?
     private(set) var lastBackgroundTaskStarted = false
 
     private var tasks: [URL: Task<Void, Never>] = [:]
+    /// Which job owns a folder's entries: a cancelled queued job must not clear a newer one's.
+    private var jobs: [URL: UUID] = [:]
     private var last: Task<Void, Never>?
     private var bgIdentifiers: [String: URL] = [:]
     private var bgTasks: [URL: BGContinuedProcessingTask] = [:]
@@ -681,6 +721,7 @@ final class Transcriptions {
 
     func phase(of folder: URL) -> Transcriber.Phase? { phases[folder.standardizedFileURL] }
     func isRunning(_ folder: URL) -> Bool { phase(of: folder) != nil }
+    var isBusy: Bool { !phases.isEmpty }
 
     /// Fraction 0…1 for display (0 while waiting or loading).
     static func fraction(_ phase: Transcriber.Phase) -> Double {
@@ -708,27 +749,64 @@ final class Transcriptions {
         }
     }
 
-    /// Starts (or queues) a transcription of `recording`.
-    func start(_ recording: Recording, speakers: Bool) {
+    /// The free transcriptions and the purchases (specs/purchase.md); tests use their own.
+    var purchases = Purchases.shared
+
+    /// The recording's key for the free count: its creation date in `.bandje.json` (the same on
+    /// every device and after a rename), else its folder name.
+    nonisolated static func purchaseKey(of folder: URL) -> String {
+        PurchaseRules.recordingKey(created: RecordingMeta.read(from: folder)?.created, folderName: folder.lastPathComponent)
+    }
+
+    /// May `recording` be transcribed now: unlocked, counted before, or a free one left.
+    func mayTranscribe(_ recording: Recording) -> Bool {
+        purchases.mayTranscribe(Self.purchaseKey(of: recording.folder))
+    }
+
+    /// Starts (or queues) a transcription of `recording`. False when the free transcriptions are
+    /// used and nothing is unlocked: nothing started, the caller shows the paywall.
+    @discardableResult
+    func start(_ recording: Recording, speakers: Bool) -> Bool {
         let folder = recording.folder.standardizedFileURL
-        guard tasks[folder] == nil, let audio = recording.audio else { return }
+        let key = Self.purchaseKey(of: folder)
+        guard purchases.mayTranscribe(key) else { return false }
+        // Not a `.caf` that was never converted: it may be incomplete, and the transcript would
+        // be named after a file that changes once it is converted.
+        guard tasks[folder] == nil, let audio = recording.audio, !recording.isUnconverted else { return true }
         errors[folder] = nil
         phases[folder] = .waiting
         let previous = last
         let title = recording.title
         let markers = recording.markers
         let recorded = recording.date
+        let job = UUID()
         let task = Task { [weak self] in
             await previous?.value
-            await self?.run(folder: folder, audio: audio, title: title, speakers: speakers, markers: markers, recorded: recorded)
+            await self?.run(folder: folder, audio: audio, title: title, speakers: speakers, markers: markers,
+                            recorded: recorded, key: key, job: job)
         }
         tasks[folder] = task
+        jobs[folder] = job
         last = task
         submitBackgroundTask(for: folder, title: title)
+        return true
+    }
+
+    private static var stoppedInBackground: String {
+        String(localized: "iOS stopped the transcription in the background. Keep Bandje open and try again.")
     }
 
     func cancel(_ folder: URL) {
-        tasks[folder.standardizedFileURL]?.cancel()
+        let folder = folder.standardizedFileURL
+        tasks[folder]?.cancel()
+        // A job that has not begun yet is gone at once (it only waits for the one before it).
+        if phases[folder] == .waiting {
+            phases[folder] = nil
+            tasks[folder] = nil
+            jobs[folder] = nil
+            if expired.remove(folder) != nil { errors[folder] = Self.stoppedInBackground }
+            finishBackgroundTask(for: folder, success: false)
+        }
     }
 
     #if DEBUG
@@ -745,34 +823,51 @@ final class Transcriptions {
     func startIfAutomatic(_ recordings: [Recording]) {
         guard UserDefaults.standard.bool(forKey: "autoTranscribe") else { return }
         let speakers = UserDefaults.standard.object(forKey: "detectSpeakers") as? Bool ?? true
+        // Past the free transcriptions `start` starts nothing and nothing pops up: the recording's
+        // screen shows the short line to Band·je Onbeperkt (`FreeLine`, specs/purchase.md).
         for recording in recordings where recording.transcript == nil { start(recording, speakers: speakers) }
     }
 
-    private func run(folder: URL, audio: URL, title: String, speakers: Bool, markers: [Double], recorded: Date) async {
+    private func run(folder: URL, audio: URL, title: String, speakers: Bool, markers: [Double], recorded: Date, key: String, job: UUID) async {
         var success = false
         defer {
-            phases[folder] = nil
-            tasks[folder] = nil
-            expired.remove(folder)
-            finishBackgroundTask(for: folder, success: success)
+            if jobs[folder] == job {
+                phases[folder] = nil
+                tasks[folder] = nil
+                jobs[folder] = nil
+                expired.remove(folder)
+                finishBackgroundTask(for: folder, success: success)
+            }
         }
         guard !Task.isCancelled else { return }
+        // Checked again now that the jobs before it are done: they may have used the last free
+        // transcription. Not an error: the recording's screen shows "used up" (`FreeLine`).
+        guard purchases.mayTranscribe(key) else { return }
         do {
+            // Audio from another device may still be in iCloud: download it first (only now, not
+            // when it appeared in the library).
+            try await Playback.ensureDownloaded(audio, timeout: 3_600)
+            try Task.checkCancellation()
             var transcript = try await Transcriber.shared.transcribe(audio, title: title, speakers: speakers, markers: markers) { phase in
                 Task { @MainActor in Transcriptions.shared.update(folder, phase) }
             }
             try Task.checkCancellation()
             transcript.recorded = recorded
+            // Read now: markers may have been added or given a note while transcribing.
+            transcript.markerSet = Markers.read(from: folder)
             // Read now: the location may have arrived after the recording stopped.
             transcript.location = RecordingMeta.read(from: folder)?.location
             let json = folder.appending(path: "\(folder.lastPathComponent).json")
             try await Task.detached { try TranscriptWriter.write(transcript, json: json) }.value
             success = true
+            written[folder, default: 0] += 1
+            // A recording counts once, when its first transcription finished (specs/purchase.md).
+            purchases.noteTranscribed(key)
             ReviewPrompt.transcriptionDone()
         } catch is CancellationError {
             // Nothing was written: the files are only written at the very end.
             if expired.remove(folder) != nil {
-                errors[folder] = String(localized: "iOS stopped the transcription in the background. Keep Bandje open and try again.")
+                errors[folder] = Self.stoppedInBackground
             }
         } catch {
             errors[folder] = error.localizedDescription
